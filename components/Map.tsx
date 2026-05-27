@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -31,36 +31,28 @@ interface Bakery {
   address: string | null;
   opening_hours: string | null;
   website: string | null;
-  distance?: number;
 }
 
 interface MapProps {
   bakeries: Bakery[];
   center: [number, number];
-  currentPos: [number, number] | null;
-  radius: number;
 }
 
-// 地図の中心を動的に変更するコンポーネント
 function MapCenter({ center }: { center: [number, number] }) {
   const map = useMap();
-  const prevCenter = useRef<[number, number] | null>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (
-      !prevCenter.current ||
-      prevCenter.current[0] !== center[0] ||
-      prevCenter.current[1] !== center[1]
-    ) {
-      map.setView(center, 14);
-      prevCenter.current = center;
+    if (!initialized.current) {
+      map.setView(center, 14); // ズーム14 = 約1km範囲
+      initialized.current = true;
     }
   }, [center, map]);
 
   return null;
 }
 
-export default function Map({ bakeries, center, currentPos, radius }: MapProps) {
+export default function Map({ bakeries, center }: MapProps) {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -84,21 +76,12 @@ export default function Map({ bakeries, center, currentPos, radius }: MapProps) 
 
       <MapCenter center={center} />
 
-      {/* 現在地マーカーと半径円 */}
-      {currentPos && (
-        <>
-          <Marker position={currentPos} icon={currentIcon}>
-            <Popup>📍 現在地</Popup>
-          </Marker>
-          <Circle
-            center={currentPos}
-            radius={radius * 1000}
-            pathOptions={{ color: "#d97706", fillColor: "#fef3c7", fillOpacity: 0.2, weight: 2 }}
-          />
-        </>
-      )}
+      {/* 現在地マーカー */}
+      <Marker position={center} icon={currentIcon}>
+        <Popup>📍 現在地</Popup>
+      </Marker>
 
-      {/* パン屋マーカー */}
+      {/* パン屋マーカー(全件) */}
       {bakeries.map((bakery) => (
         <Marker
           key={bakery.id}
@@ -108,16 +91,8 @@ export default function Map({ bakeries, center, currentPos, radius }: MapProps) 
           <Popup>
             <div className="text-sm">
               <p className="font-bold text-amber-900">🥐 {bakery.name || "名称不明"}</p>
-              {bakery.distance !== undefined && (
-                <p className="text-amber-600 text-xs mt-0.5">
-                  📍 {bakery.distance < 1
-                    ? `${Math.round(bakery.distance * 1000)}m`
-                    : `${bakery.distance.toFixed(1)}km`}
-                </p>
-              )}
-              {bakery.address && (
-                <p className="text-gray-600 text-xs mt-0.5">{bakery.address}</p>
-              )}
+              {bakery.area && <p className="text-gray-600 text-xs mt-0.5">{bakery.area}</p>}
+              {bakery.address && <p className="text-gray-600 text-xs mt-0.5">{bakery.address}</p>}
               {bakery.opening_hours && (
                 <p className="text-gray-500 text-xs mt-1">🕐 {bakery.opening_hours}</p>
               )}
