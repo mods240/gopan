@@ -3,8 +3,18 @@ import ws from 'ws';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// デバッグ用
+console.log('SUPABASE_URL:', supabaseUrl);
+console.log('KEY prefix:', supabaseKey ? supabaseKey.substring(0, 20) + '...' : 'undefined');
+
+// supabase-jsのrealtime接続を完全に無効化
 const supabase = createClient(supabaseUrl, supabaseKey, {
-  realtime: { transport: ws }
+  auth: { persistSession: false },
+  realtime: { transport: ws },
+  global: {
+    headers: { Authorization: `Bearer ${supabaseKey}` }
+  }
 });
 
 function detectArea(lat, lng) {
@@ -26,51 +36,30 @@ function buildAddress(tags) {
 }
 
 const query = `[out:json][timeout:120];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
-
-const USER_AGENT = 'gopan-bakery-app/1.0 (https://gopan.vercel.app; contact@example.com)';
+const USER_AGENT = 'gopan-bakery-app/1.0 (https://gopan.vercel.app)';
 
 async function fetchFromOverpass(serverUrl, method = 'POST') {
   let url, options;
   if (method === 'GET') {
     url = `${serverUrl}?data=${encodeURIComponent(query)}`;
-    options = {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': USER_AGENT,
-      },
-      signal: AbortSignal.timeout(180000),
-    };
+    options = { method: 'GET', headers: { 'Accept': 'application/json', 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(180000) };
   } else {
     url = serverUrl;
-    options = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': USER_AGENT,
-      },
-      body: `data=${encodeURIComponent(query)}`,
-      signal: AbortSignal.timeout(180000),
-    };
+    options = { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT }, body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(180000) };
   }
   const response = await fetch(url, options);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
 
-async function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function main() {
   console.log('🥐 ゴパン: パン屋データ同期開始');
 
   const servers = [
     { url: 'https://overpass-api.de/api/interpreter', method: 'POST' },
-    { url: 'https://overpass-api.de/api/interpreter', method: 'GET' },
     { url: 'https://overpass.kumi.systems/api/interpreter', method: 'POST' },
-    { url: 'https://overpass.kumi.systems/api/interpreter', method: 'GET' },
-    { url: 'https://overpass.openstreetmap.ru/api/interpreter', method: 'POST' },
   ];
 
   let data = null;
@@ -82,10 +71,7 @@ async function main() {
       break;
     } catch (e) {
       console.log(`❌ 失敗: ${e.message}`);
-      if (e.message.includes('429')) {
-        console.log('30秒待機中...');
-        await sleep(30000);
-      }
+      if (e.message.includes('429')) { await sleep(30000); }
     }
   }
 
@@ -99,40 +85,40 @@ async function main() {
       const lng = el.type === 'node' ? el.lon : el.center?.lon;
       if (!lat || !lng) return null;
       return {
-        id: el.id,
-        osm_type: el.type,
-        name: el.tags.name || null,
-        name_en: el.tags['name:en'] || null,
-        name_ja: el.tags['name:ja'] || null,
-        latitude: lat,
-        longitude: lng,
-        brand: el.tags.brand || null,
-        opening_hours: el.tags.opening_hours || null,
+        id: el.id, osm_type: el.type,
+        name: el.tags.name || null, name_en: el.tags['name:en'] || null, name_ja: el.tags['name:ja'] || null,
+        latitude: lat, longitude: lng,
+        brand: el.tags.brand || null, opening_hours: el.tags.opening_hours || null,
         phone: el.tags.phone || el.tags['contact:phone'] || null,
         website: el.tags.website || el.tags['contact:website'] || null,
-        takeaway: el.tags.takeaway || null,
-        wheelchair: el.tags.wheelchair || null,
-        address: buildAddress(el.tags),
-        area: detectArea(lat, lng),
-        raw_tags: el.tags,
-        updated_at: new Date().toISOString(),
+        takeaway: el.tags.takeaway || null, wheelchair: el.tags.wheelchair || null,
+        address: buildAddress(el.tags), area: detectArea(lat, lng),
+        raw_tags: el.tags, updated_at: new Date().toISOString(),
       };
-    })
-    .filter(Boolean);
+    }).filter(Boolean);
 
   console.log(`整形済み: ${bakeries.length} 件`);
 
+  // まず1件だけ試してみる
+  console.log('テスト: 1件だけupsert試行...');
+  const { data: testData, error: testError } = await supabase
+    .from('bakeries')
+    .upsert([bakeries[0]], { onConflict: 'id' })
+    .select();
+
+  if (testError) {
+    console.error('テストエラー詳細:', JSON.stringify(testError));
+    process.exit(1);
+  }
+  console.log('✅ テスト成功:', testData);
+
+  // 全件投入
   const batchSize = 500;
   let inserted = 0;
   for (let i = 0; i < bakeries.length; i += batchSize) {
     const batch = bakeries.slice(i, i + batchSize);
-    const { error } = await supabase
-      .from('bakeries')
-      .upsert(batch, { onConflict: 'id' });
-    if (error) {
-      console.error(`バッチエラー:`, error.message);
-      process.exit(1);
-    }
+    const { error } = await supabase.from('bakeries').upsert(batch, { onConflict: 'id' });
+    if (error) { console.error(`バッチエラー:`, error.message); process.exit(1); }
     inserted += batch.length;
     console.log(`✅ ${inserted}/${bakeries.length} 件投入完了`);
   }
@@ -140,7 +126,4 @@ async function main() {
   console.log(`🎉 完了! 合計 ${inserted} 件のパン屋を投入しました`);
 }
 
-main().catch(e => {
-  console.error('エラー:', e);
-  process.exit(1);
-});
+main().catch(e => { console.error('エラー:', e); process.exit(1); });
