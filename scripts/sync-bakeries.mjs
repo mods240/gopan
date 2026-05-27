@@ -25,14 +25,27 @@ function buildAddress(tags) {
   ].filter(Boolean).join(' ');
 }
 
-async function fetchFromOverpass(serverUrl) {
-  const query = `[out:json][timeout:120];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
-  const response = await fetch(serverUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(180000),
-  });
+const query = `[out:json][timeout:120];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
+
+async function fetchFromOverpass(serverUrl, method = 'GET') {
+  let url, options;
+  if (method === 'GET') {
+    url = `${serverUrl}?data=${encodeURIComponent(query)}`;
+    options = {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(180000),
+    };
+  } else {
+    url = serverUrl;
+    options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: AbortSignal.timeout(180000),
+    };
+  }
+  const response = await fetch(url, options);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
@@ -40,21 +53,29 @@ async function fetchFromOverpass(serverUrl) {
 async function main() {
   console.log('🥐 ゴパン: パン屋データ同期開始');
 
+  // GET/POSTを使い分けて試す
   const servers = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.openstreetmap.ru/api/interpreter',
+    { url: 'https://overpass-api.de/api/interpreter', method: 'GET' },
+    { url: 'https://overpass-api.de/api/interpreter', method: 'POST' },
+    { url: 'https://overpass.kumi.systems/api/interpreter', method: 'GET' },
+    { url: 'https://overpass.kumi.systems/api/interpreter', method: 'POST' },
+    { url: 'https://overpass.openstreetmap.ru/api/interpreter', method: 'GET' },
   ];
 
   let data = null;
-  for (const server of servers) {
+  for (const { url, method } of servers) {
     try {
-      console.log(`試行中: ${server}`);
-      data = await fetchFromOverpass(server);
-      console.log(`✅ 成功: ${server}`);
+      console.log(`試行中: ${method} ${url}`);
+      data = await fetchFromOverpass(url, method);
+      console.log(`✅ 成功!`);
       break;
     } catch (e) {
-      console.log(`❌ 失敗: ${server} - ${e.message}`);
+      console.log(`❌ 失敗: ${e.message}`);
+      // 429の場合は少し待つ
+      if (e.message.includes('429')) {
+        console.log('60秒待機中...');
+        await new Promise(r => setTimeout(r, 60000));
+      }
     }
   }
 
