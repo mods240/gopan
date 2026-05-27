@@ -1,21 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-import ws from 'ws';
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// デバッグ用
-console.log('SUPABASE_URL:', supabaseUrl);
-console.log('KEY prefix:', supabaseKey ? supabaseKey.substring(0, 20) + '...' : 'undefined');
-
-// supabase-jsのrealtime接続を完全に無効化
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { persistSession: false },
-  realtime: { transport: ws },
-  global: {
-    headers: { Authorization: `Bearer ${supabaseKey}` }
-  }
-});
+// supabase-jsを使わず、直接REST APIを叩く方式
 
 function detectArea(lat, lng) {
   if (lat >= 34.6 && lat <= 34.75 && lng >= 135.45 && lng <= 135.58) return '大阪市内';
@@ -38,25 +21,36 @@ function buildAddress(tags) {
 const query = `[out:json][timeout:120];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
 const USER_AGENT = 'gopan-bakery-app/1.0 (https://gopan.vercel.app)';
 
-async function fetchFromOverpass(serverUrl, method = 'POST') {
-  let url, options;
-  if (method === 'GET') {
-    url = `${serverUrl}?data=${encodeURIComponent(query)}`;
-    options = { method: 'GET', headers: { 'Accept': 'application/json', 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(180000) };
-  } else {
-    url = serverUrl;
-    options = { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT }, body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(180000) };
-  }
-  const response = await fetch(url, options);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
-}
-
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function main() {
-  console.log('🥐 ゴパン: パン屋データ同期開始');
+async function upsertBakeries(supabaseUrl, supabaseKey, bakeries) {
+  const url = `${supabaseUrl}/rest/v1/bakeries`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseKey}`,
+      'apikey': supabaseKey,
+      'Prefer': 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(bakeries),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Supabase error ${response.status}: ${text}`);
+  }
+  return response;
+}
 
+async function main() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  console.log('🥐 ゴパン: パン屋データ同期開始');
+  console.log('URL:', supabaseUrl);
+  console.log('Key prefix:', supabaseKey?.substring(0, 20) + '...');
+
+  // Overpassからデータ取得
   const servers = [
     { url: 'https://overpass-api.de/api/interpreter', method: 'POST' },
     { url: 'https://overpass.kumi.systems/api/interpreter', method: 'POST' },
@@ -66,12 +60,19 @@ async function main() {
   for (const { url, method } of servers) {
     try {
       console.log(`試行中: ${method} ${url}`);
-      data = await fetchFromOverpass(url, method);
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(180000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      data = await response.json();
       console.log(`✅ 成功!`);
       break;
     } catch (e) {
       console.log(`❌ 失敗: ${e.message}`);
-      if (e.message.includes('429')) { await sleep(30000); }
+      if (e.message.includes('429')) await sleep(30000);
     }
   }
 
@@ -99,26 +100,12 @@ async function main() {
 
   console.log(`整形済み: ${bakeries.length} 件`);
 
-  // まず1件だけ試してみる
-  console.log('テスト: 1件だけupsert試行...');
-  const { data: testData, error: testError } = await supabase
-    .from('bakeries')
-    .upsert([bakeries[0]], { onConflict: 'id' })
-    .select();
-
-  if (testError) {
-    console.error('テストエラー詳細:', JSON.stringify(testError));
-    process.exit(1);
-  }
-  console.log('✅ テスト成功:', testData);
-
-  // 全件投入
+  // 500件ずつ投入
   const batchSize = 500;
   let inserted = 0;
   for (let i = 0; i < bakeries.length; i += batchSize) {
     const batch = bakeries.slice(i, i + batchSize);
-    const { error } = await supabase.from('bakeries').upsert(batch, { onConflict: 'id' });
-    if (error) { console.error(`バッチエラー:`, error.message); process.exit(1); }
+    await upsertBakeries(supabaseUrl, supabaseKey, batch);
     inserted += batch.length;
     console.log(`✅ ${inserted}/${bakeries.length} 件投入完了`);
   }
@@ -126,4 +113,4 @@ async function main() {
   console.log(`🎉 完了! 合計 ${inserted} 件のパン屋を投入しました`);
 }
 
-main().catch(e => { console.error('エラー:', e); process.exit(1); });
+main().catch(e => { console.error('エラー:', e.message); process.exit(1); });
