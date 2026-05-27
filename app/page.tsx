@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase";
 
@@ -38,16 +38,20 @@ const ALL_REGIONS = [
 ];
 
 const STORAGE_KEY = 'gopan_selected_regions';
+const BOOKMARK_KEY = 'gopan_bookmarks';
 const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
+
+type ViewType = "map" | "list" | "bookmarks";
 
 export default function Home() {
   const [bakeries, setBakeries] = useState<Bakery[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [showRegionSelect, setShowRegionSelect] = useState(false);
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(true);
-  const [view, setView] = useState<"map" | "list">("map");
+  const [view, setView] = useState<ViewType>("map");
   const [initialized, setInitialized] = useState(false);
 
   // 現在地取得
@@ -60,7 +64,7 @@ export default function Home() {
     );
   }, []);
 
-  // 保存済みリージョンを読み込む
+  // 保存データ読み込み
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -68,10 +72,13 @@ export default function Home() {
     } else {
       setShowRegionSelect(true);
     }
+    const savedBookmarks = localStorage.getItem(BOOKMARK_KEY);
+    if (savedBookmarks) {
+      setBookmarks(new Set(JSON.parse(savedBookmarks)));
+    }
     setInitialized(true);
   }, []);
 
-  // リージョンが変わったらデータ取得
   useEffect(() => {
     if (!initialized || selectedRegions.length === 0) return;
     fetchBakeries(selectedRegions);
@@ -88,6 +95,19 @@ export default function Home() {
     setLoading(false);
   }
 
+  const toggleBookmark = useCallback((id: number) => {
+    setBookmarks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      localStorage.setItem(BOOKMARK_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
   function handleRegionToggle(region: string) {
     setSelectedRegions(prev =>
       prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
@@ -100,6 +120,8 @@ export default function Home() {
     setShowRegionSelect(false);
   }
 
+  const bookmarkedBakeries = bakeries.filter(b => bookmarks.has(b.id));
+
   // エリア選択画面
   if (showRegionSelect) {
     return (
@@ -109,9 +131,7 @@ export default function Home() {
           <p className="text-sm text-amber-200 mt-1">使うエリアを選んでください</p>
         </header>
         <div className="flex-1 px-4 py-4">
-          <p className="text-xs text-gray-500 mb-4 text-center">
-            複数選択できます。後から変更も可能です。
-          </p>
+          <p className="text-xs text-gray-500 mb-4 text-center">複数選択できます。後から変更も可能です。</p>
           <div className="grid grid-cols-1 gap-3">
             {ALL_REGIONS.map(region => {
               const isSelected = selectedRegions.includes(region.name);
@@ -135,6 +155,11 @@ export default function Home() {
               );
             })}
           </div>
+          {/* 出典表記 */}
+          <p className="text-xs text-gray-400 text-center mt-6">
+            パン屋の位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用しています。
+            情報が古い・不正確な場合があります。
+          </p>
         </div>
         <div className="sticky bottom-0 p-4 bg-amber-50 border-t border-amber-200">
           <button
@@ -164,7 +189,7 @@ export default function Home() {
         </p>
       </header>
 
-      {/* 地図/リスト切り替え */}
+      {/* タブ */}
       <div className="flex bg-white border-b border-amber-100">
         <button
           onClick={() => setView("map")}
@@ -182,6 +207,14 @@ export default function Home() {
         >
           📋 リスト
         </button>
+        <button
+          onClick={() => setView("bookmarks")}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            view === "bookmarks" ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"
+          }`}
+        >
+          ⭐ {bookmarks.size > 0 ? bookmarks.size : ""}
+        </button>
       </div>
 
       {/* メインコンテンツ */}
@@ -192,45 +225,104 @@ export default function Home() {
           </div>
         ) : view === "map" ? (
           <div className="h-full">
-            <Map bakeries={bakeries} center={center} />
+            <Map
+              bakeries={bakeries}
+              center={center}
+              bookmarks={bookmarks}
+              onToggleBookmark={toggleBookmark}
+            />
+          </div>
+        ) : view === "bookmarks" ? (
+          <div className="h-full overflow-y-auto">
+            {bookmarkedBakeries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2">
+                <p className="text-gray-500 text-sm">お気に入りはまだありません</p>
+                <p className="text-gray-400 text-xs">地図またはリストの ☆ からお気に入り登録できます</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-amber-100">
+                {bookmarkedBakeries.map((bakery) => (
+                  <li key={bakery.id} className="px-4 py-3 bg-white hover:bg-amber-50">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-medium text-amber-900 text-sm">
+                          ⭐ {bakery.name || "名称不明"}
+                        </p>
+                        {bakery.region && <p className="text-xs text-amber-600 mt-0.5">{bakery.region}</p>}
+                        {bakery.address && <p className="text-xs text-gray-500 mt-0.5">{bakery.address}</p>}
+                        {bakery.opening_hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {bakery.opening_hours}</p>}
+                      </div>
+                      <div className="flex gap-2 ml-3">
+                        <button
+                          onClick={() => toggleBookmark(bakery.id)}
+                          className="text-amber-400 text-lg"
+                        >
+                          ⭐
+                        </button>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-amber-600 text-white text-xs py-1 px-3 rounded-full whitespace-nowrap"
+                        >
+                          地図
+                        </a>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         ) : (
+          // リスト表示
           <div className="h-full overflow-y-auto">
             {bakeries.length === 0 ? (
               <div className="flex items-center justify-center h-40">
                 <p className="text-gray-500 text-sm">パン屋が見つかりません</p>
               </div>
             ) : (
-              <ul className="divide-y divide-amber-100">
-                {bakeries.map((bakery) => (
-                  <li key={bakery.id} className="px-4 py-3 bg-white hover:bg-amber-50">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium text-amber-900 text-sm">
-                          🥐 {bakery.name || "名称不明"}
-                        </p>
-                        {bakery.region && (
-                          <p className="text-xs text-amber-600 mt-0.5">{bakery.region}</p>
-                        )}
-                        {bakery.address && (
-                          <p className="text-xs text-gray-500 mt-0.5">{bakery.address}</p>
-                        )}
-                        {bakery.opening_hours && (
-                          <p className="text-xs text-gray-400 mt-0.5">🕐 {bakery.opening_hours}</p>
-                        )}
-                      </div>
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-3 bg-amber-600 text-white text-xs py-1 px-3 rounded-full whitespace-nowrap"
-                      >
-                        地図
-                      </a>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="divide-y divide-amber-100">
+                  {bakeries.map((bakery) => {
+                    const isBookmarked = bookmarks.has(bakery.id);
+                    return (
+                      <li key={bakery.id} className="px-4 py-3 bg-white hover:bg-amber-50">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-amber-900 text-sm">
+                              🥐 {bakery.name || "名称不明"}
+                            </p>
+                            {bakery.region && <p className="text-xs text-amber-600 mt-0.5">{bakery.region}</p>}
+                            {bakery.address && <p className="text-xs text-gray-500 mt-0.5">{bakery.address}</p>}
+                            {bakery.opening_hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {bakery.opening_hours}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 ml-3">
+                            <button
+                              onClick={() => toggleBookmark(bakery.id)}
+                              className={`text-xl ${isBookmarked ? "text-amber-400" : "text-gray-300"}`}
+                            >
+                              {isBookmarked ? "⭐" : "☆"}
+                            </button>
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="bg-amber-600 text-white text-xs py-1 px-3 rounded-full whitespace-nowrap"
+                            >
+                              地図
+                            </a>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {/* 出典表記 */}
+                <p className="text-xs text-gray-400 text-center py-4 px-4">
+                  位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。
+                </p>
+              </>
             )}
           </div>
         )}
