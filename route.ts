@@ -37,15 +37,35 @@ export async function GET(request: NextRequest) {
   try {
     const query = `[out:json][timeout:60];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
 
-    // リクエスト形式を修正: GETパラメータ方式に変更
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-    const overpassResponse = await fetch(url, {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-    });
+    // 複数のOverpassサーバーを順番に試す
+    const servers = [
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://overpass.openstreetmap.ru/api/interpreter",
+      "https://overpass-api.de/api/interpreter",
+    ];
 
-    if (!overpassResponse.ok) {
-      throw new Error(`Overpass API failed: ${overpassResponse.status}`);
+    let overpassResponse: Response | null = null;
+    let lastError = "";
+
+    for (const server of servers) {
+      try {
+        const res = await fetch(server, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `data=${encodeURIComponent(query)}`,
+        });
+        if (res.ok) {
+          overpassResponse = res;
+          break;
+        }
+        lastError = `${server}: ${res.status}`;
+      } catch (e) {
+        lastError = `${server}: ${e}`;
+      }
+    }
+
+    if (!overpassResponse) {
+      throw new Error(`All Overpass servers failed. Last: ${lastError}`);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
