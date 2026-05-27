@@ -37,12 +37,21 @@ const ALL_REGIONS = [
   { name: '沖縄', emoji: '🌺', desc: '沖縄全島' },
 ];
 
+// リージョンごとの詳細エリア定義
+const REGION_AREAS: Record<string, string[]> = {
+  '関西': ['大阪市内', '神戸・芦屋', '京都市内', '北摂', '阪神間', '奈良市内', 'その他'],
+  '関東': ['東京都心', '神奈川', '埼玉', '千葉'],
+};
+
 const STORAGE_KEY = 'gopan_selected_regions';
 const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
 
 export default function Home() {
   const [bakeries, setBakeries] = useState<Bakery[]>([]);
+  const [filtered, setFiltered] = useState<Bakery[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [selectedArea, setSelectedArea] = useState("すべて");
+  const [availableAreas, setAvailableAreas] = useState<string[]>([]);
   const [showRegionSelect, setShowRegionSelect] = useState(false);
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [loading, setLoading] = useState(false);
@@ -70,7 +79,7 @@ export default function Home() {
       const regions = JSON.parse(saved);
       setSelectedRegions(regions);
     } else {
-      setShowRegionSelect(true); // 初回はエリア選択画面を表示
+      setShowRegionSelect(true);
     }
     setInitialized(true);
   }, []);
@@ -81,6 +90,29 @@ export default function Home() {
     fetchBakeries(selectedRegions);
   }, [selectedRegions, initialized]);
 
+  // 選択リージョンに応じた詳細エリアを計算
+  useEffect(() => {
+    const areas: string[] = [];
+    selectedRegions.forEach(region => {
+      if (REGION_AREAS[region]) {
+        REGION_AREAS[region].forEach(area => {
+          if (!areas.includes(area)) areas.push(area);
+        });
+      }
+    });
+    setAvailableAreas(areas);
+    setSelectedArea("すべて"); // リージョン変更時はエリアをリセット
+  }, [selectedRegions]);
+
+  // エリアフィルタ
+  useEffect(() => {
+    if (selectedArea === "すべて") {
+      setFiltered(bakeries);
+    } else {
+      setFiltered(bakeries.filter(b => b.area === selectedArea));
+    }
+  }, [selectedArea, bakeries]);
+
   async function fetchBakeries(regions: string[]) {
     setLoading(true);
     const { data, error } = await supabase
@@ -89,6 +121,7 @@ export default function Home() {
       .in("region", regions);
     if (error) console.error("Supabase error:", error);
     setBakeries(data || []);
+    setFiltered(data || []);
     setLoading(false);
   }
 
@@ -119,7 +152,6 @@ export default function Home() {
           <p className="text-xs text-gray-500 mb-4 text-center">
             複数選択できます。後から変更も可能です。
           </p>
-
           <div className="grid grid-cols-1 gap-3">
             {ALL_REGIONS.map(region => {
               const isSelected = selectedRegions.includes(region.name);
@@ -140,9 +172,7 @@ export default function Home() {
                       {region.desc}
                     </p>
                   </div>
-                  {isSelected && (
-                    <span className="ml-auto text-white text-lg">✓</span>
-                  )}
+                  {isSelected && <span className="ml-auto text-white text-lg">✓</span>}
                 </button>
               );
             })}
@@ -175,7 +205,7 @@ export default function Home() {
         <h1 className="text-xl font-bold">🥐 ゴパン</h1>
         <div className="flex items-center gap-3">
           <p className="text-xs text-amber-200">
-            {loading ? "読込中..." : `${bakeries.length}件`}
+            {loading ? "読込中..." : `${filtered.length}件`}
           </p>
           <button
             onClick={() => setShowRegionSelect(true)}
@@ -186,17 +216,34 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 選択中エリア表示 */}
-      <div className="flex gap-2 px-3 py-2 overflow-x-auto bg-white border-b border-amber-100">
-        {selectedRegions.map(region => {
-          const r = ALL_REGIONS.find(r => r.name === region);
-          return (
-            <span key={region} className="whitespace-nowrap text-xs px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-              {r?.emoji} {region}
-            </span>
-          );
-        })}
-      </div>
+      {/* 詳細エリアフィルタ(関西・関東のみ表示) */}
+      {availableAreas.length > 0 && (
+        <div className="flex gap-2 px-3 py-2 overflow-x-auto bg-white border-b border-amber-100">
+          <button
+            onClick={() => setSelectedArea("すべて")}
+            className={`whitespace-nowrap text-xs px-3 py-1 rounded-full border transition-colors ${
+              selectedArea === "すべて"
+                ? "bg-amber-700 text-white border-amber-700"
+                : "bg-white text-amber-800 border-amber-300"
+            }`}
+          >
+            すべて
+          </button>
+          {availableAreas.map(area => (
+            <button
+              key={area}
+              onClick={() => setSelectedArea(area)}
+              className={`whitespace-nowrap text-xs px-3 py-1 rounded-full border transition-colors ${
+                selectedArea === area
+                  ? "bg-amber-700 text-white border-amber-700"
+                  : "bg-white text-amber-800 border-amber-300"
+              }`}
+            >
+              {area}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 地図/リスト切り替え */}
       <div className="flex bg-white border-b border-amber-100">
@@ -226,17 +273,17 @@ export default function Home() {
           </div>
         ) : view === "map" ? (
           <div className="h-full">
-            <Map bakeries={bakeries} center={center} />
+            <Map bakeries={filtered} center={center} />
           </div>
         ) : (
           <div className="h-full overflow-y-auto">
-            {bakeries.length === 0 ? (
+            {filtered.length === 0 ? (
               <div className="flex items-center justify-center h-40">
                 <p className="text-gray-500 text-sm">パン屋が見つかりません</p>
               </div>
             ) : (
               <ul className="divide-y divide-amber-100">
-                {bakeries.map((bakery) => (
+                {filtered.map((bakery) => (
                   <li key={bakery.id} className="px-4 py-3 bg-white hover:bg-amber-50">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
