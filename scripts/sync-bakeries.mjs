@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  realtime: { transport: ws }
+});
 
 function detectArea(lat, lng) {
   if (lat >= 34.6 && lat <= 34.75 && lng >= 135.45 && lng <= 135.58) return '大阪市内';
@@ -24,14 +27,12 @@ function buildAddress(tags) {
 
 async function fetchFromOverpass(serverUrl) {
   const query = `[out:json][timeout:120];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
-  
   const response = await fetch(serverUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(180000), // 3分タイムアウト
+    signal: AbortSignal.timeout(180000),
   });
-
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
@@ -39,7 +40,6 @@ async function fetchFromOverpass(serverUrl) {
 async function main() {
   console.log('🥐 ゴパン: パン屋データ同期開始');
 
-  // 複数サーバーを試す
   const servers = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
@@ -59,7 +59,6 @@ async function main() {
   }
 
   if (!data) throw new Error('全サーバーへのアクセスが失敗しました');
-
   console.log(`取得件数: ${data.elements.length}`);
 
   const bakeries = data.elements
@@ -92,7 +91,6 @@ async function main() {
 
   console.log(`整形済み: ${bakeries.length} 件`);
 
-  // 500件ずつバッチでupsert
   const batchSize = 500;
   let inserted = 0;
   for (let i = 0; i < bakeries.length; i += batchSize) {
@@ -100,7 +98,6 @@ async function main() {
     const { error } = await supabase
       .from('bakeries')
       .upsert(batch, { onConflict: 'id' });
-
     if (error) {
       console.error(`バッチエラー:`, error.message);
       process.exit(1);
