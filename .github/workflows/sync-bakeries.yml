@@ -2,12 +2,18 @@ name: Sync Bakeries from OpenStreetMap
 
 on:
   workflow_dispatch:
+    inputs:
+      region:
+        description: '同期するリージョン (all / 関西 / 関東 / 中京 / 北陸・信越 / 東北 / 中国・四国 / 九州 / 北海道 / 沖縄)'
+        required: false
+        default: 'all'
   schedule:
-    - cron: '0 2 1 * *'
+    - cron: '0 2 1 * *' # 毎月1日の午前2時
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -23,4 +29,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TARGET_REGION: ${{ github.event.inputs.region || 'all' }}
         run: node scripts/sync-bakeries.mjs
