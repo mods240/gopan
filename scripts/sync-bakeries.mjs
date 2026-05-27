@@ -27,20 +27,28 @@ function buildAddress(tags) {
 
 const query = `[out:json][timeout:120];(node["shop"="bakery"](34.5,134.95,35.15,135.95);way["shop"="bakery"](34.5,134.95,35.15,135.95););out center tags;`;
 
-async function fetchFromOverpass(serverUrl, method = 'GET') {
+const USER_AGENT = 'gopan-bakery-app/1.0 (https://gopan.vercel.app; contact@example.com)';
+
+async function fetchFromOverpass(serverUrl, method = 'POST') {
   let url, options;
   if (method === 'GET') {
     url = `${serverUrl}?data=${encodeURIComponent(query)}`;
     options = {
       method: 'GET',
-      headers: { 'Accept': 'application/json' },
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': USER_AGENT,
+      },
       signal: AbortSignal.timeout(180000),
     };
   } else {
     url = serverUrl;
     options = {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': USER_AGENT,
+      },
       body: `data=${encodeURIComponent(query)}`,
       signal: AbortSignal.timeout(180000),
     };
@@ -50,16 +58,19 @@ async function fetchFromOverpass(serverUrl, method = 'GET') {
   return response.json();
 }
 
+async function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
 async function main() {
   console.log('🥐 ゴパン: パン屋データ同期開始');
 
-  // GET/POSTを使い分けて試す
   const servers = [
-    { url: 'https://overpass-api.de/api/interpreter', method: 'GET' },
     { url: 'https://overpass-api.de/api/interpreter', method: 'POST' },
-    { url: 'https://overpass.kumi.systems/api/interpreter', method: 'GET' },
+    { url: 'https://overpass-api.de/api/interpreter', method: 'GET' },
     { url: 'https://overpass.kumi.systems/api/interpreter', method: 'POST' },
-    { url: 'https://overpass.openstreetmap.ru/api/interpreter', method: 'GET' },
+    { url: 'https://overpass.kumi.systems/api/interpreter', method: 'GET' },
+    { url: 'https://overpass.openstreetmap.ru/api/interpreter', method: 'POST' },
   ];
 
   let data = null;
@@ -71,10 +82,9 @@ async function main() {
       break;
     } catch (e) {
       console.log(`❌ 失敗: ${e.message}`);
-      // 429の場合は少し待つ
       if (e.message.includes('429')) {
-        console.log('60秒待機中...');
-        await new Promise(r => setTimeout(r, 60000));
+        console.log('30秒待機中...');
+        await sleep(30000);
       }
     }
   }
