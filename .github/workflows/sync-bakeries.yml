@@ -1,9 +1,9 @@
 name: Sync Bakeries from OpenStreetMap
 
 on:
-  workflow_dispatch: # 手動実行
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 1 * *' # 毎月1日の午前2時に自動実行
+    - cron: '0 2 1 * *'
 
 jobs:
   sync:
@@ -14,10 +14,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
-        run: npm install @supabase/supabase-js node-fetch
+        run: npm install @supabase/supabase-js ws
 
       - name: Run sync script
         env:
