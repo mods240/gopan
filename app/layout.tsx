@@ -1,9 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#92400e",
+};
+
 export const metadata: Metadata = {
-  title: "ゴパン - 助手席で見つけて運転手に届ける",
-  description: "京阪神のパン屋を、ドライブ中に見つけられる地図アプリ",
+  title: "ゴパン - パン屋ナビ",
+  description: "全国のパン屋を地図で見つけるアプリ。現在地周辺のパン屋をすぐに発見。",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ゴパン",
+  },
+  icons: {
+    apple: "/icon-192.png",
+  },
 };
 
 export default function RootLayout({
@@ -13,6 +30,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ゴパン" />
+      </head>
       <body className="antialiased">{children}</body>
     </html>
   );
