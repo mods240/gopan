@@ -26,29 +26,12 @@ const starIcon = L.divIcon({
   className: "",
 });
 
-// 現在地+方向マーカーを動的に生成
 function createCurrentIcon(heading: number | null) {
   const arrow = heading !== null
-    ? `<div style="
-        position:absolute;top:-18px;left:50%;transform:translateX(-50%) rotate(${heading}deg);
-        width:0;height:0;
-        border-left:6px solid transparent;
-        border-right:6px solid transparent;
-        border-bottom:16px solid #2563eb;
-        filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));
-      "></div>`
+    ? `<div style="position:absolute;top:-20px;left:50%;transform:translateX(-50%) rotate(${heading}deg);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:18px solid #2563eb;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4))"></div>`
     : '';
   return L.divIcon({
-    html: `<div style="position:relative;width:20px;height:20px">
-      ${arrow}
-      <div style="
-        width:20px;height:20px;
-        background:#2563eb;border:3px solid white;
-        border-radius:50%;
-        box-shadow:0 2px 6px rgba(0,0,0,0.4);
-        position:absolute;top:0;left:0;
-      "></div>
-    </div>`,
+    html: `<div style="position:relative;width:20px;height:20px">${arrow}<div style="width:20px;height:20px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);position:absolute;top:0;left:0"></div></div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
     className: "",
@@ -74,97 +57,25 @@ interface MapProps {
   onToggleBookmark: (id: number) => void;
 }
 
-function MapCenter({ center }: { center: [number, number] }) {
+function MapInit({ center }: { center: [number, number] }) {
   const map = useMap();
   const initialized = useRef(false);
   useEffect(() => {
     if (!initialized.current) {
       map.setView(center, 14);
       initialized.current = true;
+      // グローバルにmapを保持(現在地ボタン用)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any)._gopanMap = map;
     }
   }, [center, map]);
   return null;
 }
 
-// コンパス + 現在地ボタン + ヘディングアップ制御
-function MapControls({
-  center,
-  heading,
-  headingUp,
-  onToggleHeadingUp,
-}: {
-  center: [number, number];
-  heading: number | null;
-  headingUp: boolean;
-  onToggleHeadingUp: () => void;
-}) {
-  const map = useMap();
-
-  // ヘディングアップ時に地図を回転
-  useEffect(() => {
-    if (headingUp && heading !== null) {
-      map.setBearing(-heading);
-    } else if (!headingUp) {
-      map.setBearing(0);
-    }
-  }, [heading, headingUp, map]);
-
-  return (
-    <div style={{ position: "absolute", bottom: "24px", right: "12px", zIndex: 1000, display: "flex", flexDirection: "column", gap: "8px" }}>
-      {/* コンパス */}
-      <div style={{
-        width: "44px", height: "44px", borderRadius: "50%",
-        background: "white", border: "2px solid #d97706",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "22px",
-        transform: heading !== null ? `rotate(${-heading}deg)` : "none",
-        transition: "transform 0.3s ease",
-      }}>
-        🧭
-      </div>
-
-      {/* ヘディングアップ切り替え */}
-      <button
-        onClick={onToggleHeadingUp}
-        style={{
-          width: "44px", height: "44px", borderRadius: "50%",
-          background: headingUp ? "#d97706" : "white",
-          border: "2px solid #d97706",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-          fontSize: "18px", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: headingUp ? "white" : "#d97706",
-        }}
-        title={headingUp ? "ノースアップに切り替え" : "ヘディングアップに切り替え"}
-      >
-        {headingUp ? "🔒" : "📐"}
-      </button>
-
-      {/* 現在地に戻る */}
-      <button
-        onClick={() => {
-          map.setView(center, 14);
-          if (!headingUp) map.setBearing(0);
-        }}
-        style={{
-          width: "44px", height: "44px", borderRadius: "50%",
-          background: "white", border: "2px solid #d97706",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-          fontSize: "20px", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-        title="現在地に戻る"
-      >
-        📍
-      </button>
-    </div>
-  );
-}
-
 export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: MapProps) {
   const [heading, setHeading] = useState<number | null>(null);
   const [headingUp, setHeadingUp] = useState(false);
+  const [iosPermission, setIosPermission] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,75 +85,143 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
       iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
       shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     });
-  }, []);
 
-  // デバイスの向きを取得
-  useEffect(() => {
-    // iOS13以降はパーミッション要求が必要
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const DeviceOrientationEventTyped = DeviceOrientationEvent as any;
-    if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
-      // iOSの場合はタップ時に許可を求める(別途ボタンで対応)
+    const DOE = DeviceOrientationEvent as any;
+    if (typeof DOE.requestPermission === 'function') {
+      setIosPermission(true); // iOS: ボタンで許可が必要
+    } else {
+      listenOrientation(); // Android: 直接開始
     }
-
-    function handleOrientation(e: DeviceOrientationEvent) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const compassHeading = (e as any).webkitCompassHeading ?? e.alpha;
-      if (compassHeading !== null) {
-        setHeading(Math.round(compassHeading));
-      }
-    }
-
-    window.addEventListener('deviceorientation', handleOrientation, true);
-    return () => window.removeEventListener('deviceorientation', handleOrientation, true);
   }, []);
+
+  function listenOrientation() {
+    window.addEventListener('deviceorientation', (e: DeviceOrientationEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ios = (e as any).webkitCompassHeading;
+      if (ios != null) {
+        setHeading(Math.round(ios));
+      } else if (e.alpha != null) {
+        setHeading(Math.round((360 - e.alpha) % 360));
+      }
+    }, true);
+  }
+
+  async function requestIosPermission() {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await (DeviceOrientationEvent as any).requestPermission();
+      if (result === 'granted') {
+        setIosPermission(false);
+        listenOrientation();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function goToCurrentLocation() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const map = (window as any)._gopanMap;
+    if (map) map.setView(center, 14);
+  }
+
+  // ヘディングアップ: leaflet-containerをCSS回転
+  useEffect(() => {
+    const el = document.querySelector('.leaflet-container') as HTMLElement;
+    if (!el) return;
+    if (headingUp && heading !== null) {
+      el.style.transform = `rotate(${-heading}deg)`;
+      el.style.transition = 'transform 0.3s ease';
+    } else {
+      el.style.transform = 'rotate(0deg)';
+      el.style.transition = 'transform 0.3s ease';
+    }
+  }, [heading, headingUp]);
 
   const currentIcon = createCurrentIcon(heading);
 
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%" }}>
-      {/* iOS向けコンパス許可ボタン */}
-      {heading === null && (
+    <div style={{ position: "relative", height: "100%", width: "100%", overflow: "hidden" }}>
+
+      {/* iOSコンパス許可ボタン */}
+      {iosPermission && (
         <button
-          onClick={async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const DeviceOrientationEventTyped = DeviceOrientationEvent as any;
-            if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
-              await DeviceOrientationEventTyped.requestPermission();
-            }
-          }}
+          onClick={requestIosPermission}
           style={{
             position: "absolute", top: "10px", left: "50%",
             transform: "translateX(-50%)",
             zIndex: 1000, background: "white",
             border: "1px solid #d97706", borderRadius: "20px",
-            padding: "4px 12px", fontSize: "12px", cursor: "pointer",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+            padding: "6px 14px", fontSize: "12px", cursor: "pointer",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.2)", whiteSpace: "nowrap",
           }}
         >
           🧭 コンパスを有効にする
         </button>
       )}
 
+      {/* 右下のコントロール */}
+      <div style={{
+        position: "absolute", bottom: "24px", right: "12px",
+        zIndex: 1000, display: "flex", flexDirection: "column", gap: "8px",
+      }}>
+        {/* コンパスローズ(向きに応じて回転) */}
+        <div style={{
+          width: "44px", height: "44px", borderRadius: "50%",
+          background: "white", border: "2px solid #d97706",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "22px",
+          transform: heading !== null && !headingUp ? `rotate(${-heading}deg)` : "none",
+          transition: "transform 0.3s ease",
+        }}>
+          🧭
+        </div>
+
+        {/* ヘディングアップ / ノースアップ切り替え */}
+        <button
+          onClick={() => setHeadingUp(v => !v)}
+          style={{
+            width: "44px", height: "44px", borderRadius: "50%",
+            background: headingUp ? "#d97706" : "white",
+            border: "2px solid #d97706",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            fontSize: "11px", fontWeight: "bold",
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: headingUp ? "white" : "#92400e",
+          }}
+        >
+          {headingUp ? "HDG" : "N↑"}
+        </button>
+
+        {/* 現在地に戻る */}
+        <button
+          onClick={goToCurrentLocation}
+          style={{
+            width: "44px", height: "44px", borderRadius: "50%",
+            background: "white", border: "2px solid #d97706",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            fontSize: "20px", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          📍
+        </button>
+      </div>
+
       <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapCenter center={center} />
-        <MapControls
-          center={center}
-          heading={heading}
-          headingUp={headingUp}
-          onToggleHeadingUp={() => setHeadingUp(v => !v)}
-        />
+        <MapInit center={center} />
 
-        {/* 現在地マーカー(方向付き) */}
         <Marker position={center} icon={currentIcon}>
           <Popup>📍 現在地{heading !== null ? `　方位: ${heading}°` : ""}</Popup>
         </Marker>
 
-        {/* パン屋マーカー */}
         {bakeries.map((bakery) => {
           const isBookmarked = bookmarks.has(bakery.id);
           return (
