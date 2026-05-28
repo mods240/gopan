@@ -1,0 +1,24 @@
+{
+  "name": "ゴパン - パン屋ナビ",
+  "short_name": "ゴパン",
+  "description": "全国のパン屋を地図で見つけるアプリ。現在地周辺のパン屋をすぐに発見。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#92400e",
+  "theme_color": "#92400e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
