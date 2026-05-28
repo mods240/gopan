@@ -26,7 +26,6 @@ const starIcon = L.divIcon({
   className: "",
 });
 
-// Google Maps風：青丸＋方向ビーム（扇形）
 function createCurrentIcon(heading: number | null) {
   const beam = heading !== null ? `
     <div style="
@@ -35,28 +34,25 @@ function createCurrentIcon(heading: number | null) {
       left:50%;
       transform:translateX(-50%) rotate(${heading}deg);
       transform-origin:bottom center;
-      width:0;
-      height:0;
+      width:0;height:0;
       border-left:18px solid transparent;
       border-right:18px solid transparent;
-      border-top:48px solid rgba(37,99,235,0.25);
-      filter:drop-shadow(0 0 4px rgba(37,99,235,0.4));
+      border-top:52px solid rgba(37,99,235,0.22);
+      filter:drop-shadow(0 0 4px rgba(37,99,235,0.3));
     "></div>` : '';
 
   return L.divIcon({
-    html: `
-      <div style="position:relative;width:20px;height:20px">
-        ${beam}
-        <div style="
-          position:absolute;top:0;left:0;
-          width:20px;height:20px;
-          background:#2563eb;
-          border:3px solid white;
-          border-radius:50%;
-          box-shadow:0 2px 8px rgba(37,99,235,0.6);
-          z-index:2;
-        "></div>
-      </div>`,
+    html: `<div style="position:relative;width:20px;height:20px">
+      ${beam}
+      <div style="
+        position:absolute;top:0;left:0;
+        width:20px;height:20px;
+        background:#2563eb;border:3px solid white;
+        border-radius:50%;
+        box-shadow:0 2px 8px rgba(37,99,235,0.6);
+        z-index:2;
+      "></div>
+    </div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
     className: "",
@@ -109,12 +105,9 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
       shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     });
 
-    // ヘディングアップのCSS回転を解除(地図は回転させない)
+    // 地図回転を解除
     const el = document.querySelector('.leaflet-container') as HTMLElement;
-    if (el) {
-      el.style.transform = '';
-      el.style.transition = '';
-    }
+    if (el) { el.style.transform = ''; el.style.transition = ''; }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const DOE = DeviceOrientationEvent as any;
@@ -130,9 +123,19 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ios = (e as any).webkitCompassHeading;
       if (ios != null) {
+        // iOS: webkitCompassHeadingは0=北、時計回りで正確
         setHeading(Math.round(ios));
       } else if (e.alpha != null) {
-        setHeading(Math.round((360 - e.alpha) % 360));
+        // Android: 画面の向き(portrait=縦持ち)を考慮
+        // screen.orientationが使えない環境も考慮
+        let screenAngle = 0;
+        if (window.screen?.orientation?.angle != null) {
+          screenAngle = window.screen.orientation.angle;
+        }
+        // alphaは反時計回りなので、北基準時計回りに変換
+        // さらに画面の向きオフセットを加算
+        const adjusted = (360 - e.alpha + screenAngle) % 360;
+        setHeading(Math.round(adjusted));
       }
     }, true);
   }
@@ -161,7 +164,6 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
   return (
     <div style={{ position: "relative", height: "100%", width: "100%" }}>
 
-      {/* iOSコンパス許可ボタン */}
       {iosPermission && (
         <button
           onClick={requestIosPermission}
@@ -178,12 +180,10 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         </button>
       )}
 
-      {/* 右下のコントロール */}
       <div style={{
         position: "absolute", bottom: "24px", right: "12px",
         zIndex: 1000, display: "flex", flexDirection: "column", gap: "8px",
       }}>
-        {/* コンパスローズ */}
         <div style={{
           width: "44px", height: "44px", borderRadius: "50%",
           background: "white", border: "2px solid #d97706",
@@ -195,8 +195,6 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         }}>
           🧭
         </div>
-
-        {/* 現在地に戻る */}
         <button
           onClick={goToCurrentLocation}
           style={{
@@ -218,15 +216,12 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         />
         <MapInit center={center} />
 
-        {/* 現在地マーカー(方向ビーム付き) */}
         <Marker position={center} icon={currentIcon}>
           <Popup>
-            📍 現在地
-            {heading !== null ? `　方位: ${heading}°` : ""}
+            📍 現在地{heading !== null ? `　方位: ${heading}°` : ""}
           </Popup>
         </Marker>
 
-        {/* パン屋マーカー */}
         {bakeries.map((bakery) => {
           const isBookmarked = bookmarks.has(bakery.id);
           return (
