@@ -26,12 +26,37 @@ const starIcon = L.divIcon({
   className: "",
 });
 
+// Google Maps風：青丸＋方向ビーム（扇形）
 function createCurrentIcon(heading: number | null) {
-  const arrow = heading !== null
-    ? `<div style="position:absolute;top:-20px;left:50%;transform:translateX(-50%) rotate(${heading}deg);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:18px solid #2563eb;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4))"></div>`
-    : '';
+  const beam = heading !== null ? `
+    <div style="
+      position:absolute;
+      bottom:10px;
+      left:50%;
+      transform:translateX(-50%) rotate(${heading}deg);
+      transform-origin:bottom center;
+      width:0;
+      height:0;
+      border-left:18px solid transparent;
+      border-right:18px solid transparent;
+      border-top:48px solid rgba(37,99,235,0.25);
+      filter:drop-shadow(0 0 4px rgba(37,99,235,0.4));
+    "></div>` : '';
+
   return L.divIcon({
-    html: `<div style="position:relative;width:20px;height:20px">${arrow}<div style="width:20px;height:20px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);position:absolute;top:0;left:0"></div></div>`,
+    html: `
+      <div style="position:relative;width:20px;height:20px">
+        ${beam}
+        <div style="
+          position:absolute;top:0;left:0;
+          width:20px;height:20px;
+          background:#2563eb;
+          border:3px solid white;
+          border-radius:50%;
+          box-shadow:0 2px 8px rgba(37,99,235,0.6);
+          z-index:2;
+        "></div>
+      </div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
     className: "",
@@ -64,7 +89,6 @@ function MapInit({ center }: { center: [number, number] }) {
     if (!initialized.current) {
       map.setView(center, 14);
       initialized.current = true;
-      // グローバルにmapを保持(現在地ボタン用)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any)._gopanMap = map;
     }
@@ -74,7 +98,6 @@ function MapInit({ center }: { center: [number, number] }) {
 
 export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: MapProps) {
   const [heading, setHeading] = useState<number | null>(null);
-  const [headingUp, setHeadingUp] = useState(false);
   const [iosPermission, setIosPermission] = useState(false);
 
   useEffect(() => {
@@ -86,12 +109,19 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
       shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     });
 
+    // ヘディングアップのCSS回転を解除(地図は回転させない)
+    const el = document.querySelector('.leaflet-container') as HTMLElement;
+    if (el) {
+      el.style.transform = '';
+      el.style.transition = '';
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const DOE = DeviceOrientationEvent as any;
     if (typeof DOE.requestPermission === 'function') {
-      setIosPermission(true); // iOS: ボタンで許可が必要
+      setIosPermission(true);
     } else {
-      listenOrientation(); // Android: 直接開始
+      listenOrientation();
     }
   }, []);
 
@@ -126,23 +156,10 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
     if (map) map.setView(center, 14);
   }
 
-  // ヘディングアップ: leaflet-containerをCSS回転
-  useEffect(() => {
-    const el = document.querySelector('.leaflet-container') as HTMLElement;
-    if (!el) return;
-    if (headingUp && heading !== null) {
-      el.style.transform = `rotate(${-heading}deg)`;
-      el.style.transition = 'transform 0.3s ease';
-    } else {
-      el.style.transform = 'rotate(0deg)';
-      el.style.transition = 'transform 0.3s ease';
-    }
-  }, [heading, headingUp]);
-
   const currentIcon = createCurrentIcon(heading);
 
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%", overflow: "hidden" }}>
+    <div style={{ position: "relative", height: "100%", width: "100%" }}>
 
       {/* iOSコンパス許可ボタン */}
       {iosPermission && (
@@ -166,35 +183,18 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         position: "absolute", bottom: "24px", right: "12px",
         zIndex: 1000, display: "flex", flexDirection: "column", gap: "8px",
       }}>
-        {/* コンパスローズ(向きに応じて回転) */}
+        {/* コンパスローズ */}
         <div style={{
           width: "44px", height: "44px", borderRadius: "50%",
           background: "white", border: "2px solid #d97706",
           boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: "22px",
-          transform: heading !== null && !headingUp ? `rotate(${-heading}deg)` : "none",
-          transition: "transform 0.3s ease",
+          transform: heading !== null ? `rotate(${-heading}deg)` : "none",
+          transition: "transform 0.2s ease",
         }}>
           🧭
         </div>
-
-        {/* ヘディングアップ / ノースアップ切り替え */}
-        <button
-          onClick={() => setHeadingUp(v => !v)}
-          style={{
-            width: "44px", height: "44px", borderRadius: "50%",
-            background: headingUp ? "#d97706" : "white",
-            border: "2px solid #d97706",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-            fontSize: "11px", fontWeight: "bold",
-            cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: headingUp ? "white" : "#92400e",
-          }}
-        >
-          {headingUp ? "HDG" : "N↑"}
-        </button>
 
         {/* 現在地に戻る */}
         <button
@@ -218,10 +218,15 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         />
         <MapInit center={center} />
 
+        {/* 現在地マーカー(方向ビーム付き) */}
         <Marker position={center} icon={currentIcon}>
-          <Popup>📍 現在地{heading !== null ? `　方位: ${heading}°` : ""}</Popup>
+          <Popup>
+            📍 現在地
+            {heading !== null ? `　方位: ${heading}°` : ""}
+          </Popup>
         </Marker>
 
+        {/* パン屋マーカー */}
         {bakeries.map((bakery) => {
           const isBookmarked = bookmarks.has(bakery.id);
           return (
