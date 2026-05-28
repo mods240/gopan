@@ -27,34 +27,54 @@ const starIcon = L.divIcon({
 });
 
 function createCurrentIcon(heading: number | null) {
+  // ビーム(向いてる方向)
   const beam = heading !== null ? `
     <div style="
       position:absolute;
-      bottom:10px;
+      bottom:13px;
       left:50%;
       transform:translateX(-50%) rotate(${heading}deg);
       transform-origin:bottom center;
       width:0;height:0;
-      border-left:18px solid transparent;
-      border-right:18px solid transparent;
-      border-top:52px solid rgba(37,99,235,0.22);
+      border-left:16px solid transparent;
+      border-right:16px solid transparent;
+      border-top:50px solid rgba(37,99,235,0.22);
       filter:drop-shadow(0 0 4px rgba(37,99,235,0.3));
     "></div>` : '';
 
+  // 青丸コンパス: Nが常に上(北)を向く → headingの逆回転
+  // heading=0(北向き)なら回転なし、heading=90(東向き)なら-90度回転でNが北に固定
+  const compassRotate = heading !== null ? -heading : 0;
+
   return L.divIcon({
-    html: `<div style="position:relative;width:20px;height:20px">
+    html: `<div style="position:relative;width:26px;height:26px">
       ${beam}
       <div style="
         position:absolute;top:0;left:0;
-        width:20px;height:20px;
-        background:#2563eb;border:3px solid white;
+        width:26px;height:26px;
+        background:#2563eb;
+        border:3px solid white;
         border-radius:50%;
         box-shadow:0 2px 8px rgba(37,99,235,0.6);
         z-index:2;
-      "></div>
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        transform:rotate(${compassRotate}deg);
+        transition:transform 0.2s ease;
+      ">
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <!-- 北(赤) -->
+          <polygon points="8,1 10,8 8,7 6,8" fill="#ef4444"/>
+          <!-- 南(白) -->
+          <polygon points="8,15 10,8 8,9 6,8" fill="white" opacity="0.9"/>
+          <!-- 中心点 -->
+          <circle cx="8" cy="8" r="1.5" fill="white"/>
+        </svg>
+      </div>
     </div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
     className: "",
   });
 }
@@ -123,17 +143,12 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ios = (e as any).webkitCompassHeading;
       if (ios != null) {
-        // iOS: webkitCompassHeadingは0=北、時計回りで正確
         setHeading(Math.round(ios));
       } else if (e.alpha != null) {
-        // Android: 画面の向き(portrait=縦持ち)を考慮
-        // screen.orientationが使えない環境も考慮
         let screenAngle = 0;
         if (window.screen?.orientation?.angle != null) {
           screenAngle = window.screen.orientation.angle;
         }
-        // alphaは反時計回りなので、北基準時計回りに変換
-        // さらに画面の向きオフセットを加算
         const adjusted = (360 - e.alpha + screenAngle) % 360;
         setHeading(Math.round(adjusted));
       }
@@ -180,21 +195,34 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         </button>
       )}
 
+      {/* 右下コントロール */}
       <div style={{
         position: "absolute", bottom: "24px", right: "12px",
         zIndex: 1000, display: "flex", flexDirection: "column", gap: "8px",
       }}>
+        {/* 右下コンパスローズ(補助) */}
         <div style={{
           width: "44px", height: "44px", borderRadius: "50%",
           background: "white", border: "2px solid #d97706",
           boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "22px",
-          transform: heading !== null ? `rotate(${-heading}deg)` : "none",
-          transition: "transform 0.2s ease",
         }}>
-          🧭
+          <svg width="28" height="28" viewBox="0 0 28 28"
+            style={{
+              transform: heading !== null ? `rotate(${-heading}deg)` : "none",
+              transition: "transform 0.2s ease",
+            }}
+          >
+            <polygon points="14,2 16,14 14,12 12,14" fill="#ef4444"/>
+            <polygon points="14,26 16,14 14,16 12,14" fill="#999"/>
+            <polygon points="2,14 14,12 12,14 14,16" fill="#999"/>
+            <polygon points="26,14 14,12 16,14 14,16" fill="#999"/>
+            <circle cx="14" cy="14" r="2" fill="#333"/>
+            <text x="14" y="8" textAnchor="middle" fontSize="5" fill="#ef4444" fontWeight="bold">N</text>
+          </svg>
         </div>
+
+        {/* 現在地に戻る */}
         <button
           onClick={goToCurrentLocation}
           style={{
@@ -216,6 +244,7 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         />
         <MapInit center={center} />
 
+        {/* 現在地マーカー: コンパス内蔵+ビーム */}
         <Marker position={center} icon={currentIcon}>
           <Popup>
             📍 現在地{heading !== null ? `　方位: ${heading}°` : ""}
