@@ -108,13 +108,17 @@ export default function Home() {
   useEffect(() => { pairIdRef.current = pairId; }, [pairId]);
 
   // 自分のsenderIdを生成(初回のみ)
-  const senderIdRef = useRef<string>(
-    localStorage.getItem('gopan_sender_id') || (() => {
+  const senderIdRef = useRef<string>('');
+  useEffect(() => {
+    const saved = localStorage.getItem('gopan_sender_id');
+    if (saved) {
+      senderIdRef.current = saved;
+    } else {
       const id = Math.random().toString(36).substring(2, 10);
       localStorage.setItem('gopan_sender_id', id);
-      return id;
-    })()
-  );
+      senderIdRef.current = id;
+    }
+  }, []);
 
   // ペアルーム作成
   const createPair = async () => {
