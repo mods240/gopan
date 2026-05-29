@@ -139,15 +139,16 @@ export default function Home() {
   // Realtime購読
   const subscribePair = (id: string) => {
     supabase.removeAllChannels();
-    supabase
+    const channel = supabase
       .channel('pair-' + id)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'gopan_shared_bakeries',
-        filter: 'pair_id=eq.' + id,
       }, (payload) => {
-        const row = payload.new as { bakery_id: number; bakery_name: string; latitude: number; longitude: number; address: string };
+        const row = payload.new as { pair_id: string; bakery_id: number; bakery_name: string; latitude: number; longitude: number; address: string };
+        // pair_idが一致する場合のみ処理
+        if (row.pair_id !== id) return;
         setReceivedBakery({
           id: row.bakery_id,
           name: row.bakery_name,
@@ -160,7 +161,10 @@ export default function Home() {
           region: null,
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime status:', status);
+      });
+    console.log('Subscribed to channel:', channel);
   };
 
   // 店舗を送信
