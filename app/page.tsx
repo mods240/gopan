@@ -40,6 +40,7 @@ const ALL_REGIONS = [
 
 const STORAGE_KEY = 'gopan_selected_regions';
 const BOOKMARK_KEY = 'gopan_bookmarks';
+const INTERESTED_KEY = 'gopan_interested';
 const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
 
 type ViewType = "map" | "list" | "bookmarks";
@@ -62,6 +63,7 @@ export default function Home() {
   const [bakeries, setBakeries] = useState<Bakery[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
+  const [interested, setInterested] = useState<Set<number>>(new Set());
   const [showRegionSelect, setShowRegionSelect] = useState(false);
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [hasLocation, setHasLocation] = useState(false);
@@ -69,10 +71,8 @@ export default function Home() {
   const [locating, setLocating] = useState(true);
   const [view, setView] = useState<ViewType>("map");
   const [initialized, setInitialized] = useState(false);
-  const [selectedBakery, setSelectedBakery] = useState<Bakery | null>(null);
   const currentPosRef = useRef<[number, number] | null>(null);
 
-  // 現在地取得
   useEffect(() => {
     if (!navigator.geolocation) { setLocating(false); return; }
     navigator.geolocation.getCurrentPosition(
@@ -88,13 +88,14 @@ export default function Home() {
     );
   }, []);
 
-  // 保存データ読み込み
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) { setSelectedRegions(JSON.parse(saved)); }
     else { setShowRegionSelect(true); }
     const savedBookmarks = localStorage.getItem(BOOKMARK_KEY);
     if (savedBookmarks) { setBookmarks(new Set(JSON.parse(savedBookmarks))); }
+    const savedInterested = localStorage.getItem(INTERESTED_KEY);
+    if (savedInterested) { setInterested(new Set(JSON.parse(savedInterested))); }
     setInitialized(true);
   }, []);
 
@@ -103,7 +104,6 @@ export default function Home() {
     fetchBakeries(selectedRegions);
   }, [selectedRegions, initialized]);
 
-  // 現在地が取れたら距離を再計算
   useEffect(() => {
     if (!hasLocation || bakeries.length === 0) return;
     const [lat, lng] = center;
@@ -121,14 +121,10 @@ export default function Home() {
       .in("region", regions);
     if (error) console.error("Supabase error:", error);
     const raw = data || [];
-    // 現在地が既に取れていれば距離計算
     const pos = currentPosRef.current;
     if (pos) {
       const [lat, lng] = pos;
-      setBakeries(raw.map(b => ({
-        ...b,
-        distance: calcDistance(lat, lng, b.latitude, b.longitude)
-      })));
+      setBakeries(raw.map(b => ({ ...b, distance: calcDistance(lat, lng, b.latitude, b.longitude) })));
     } else {
       setBakeries(raw);
     }
@@ -144,17 +140,14 @@ export default function Home() {
     });
   }, []);
 
-  // リストから地図にジャンプ
-  function handleSelectBakery(bakery: Bakery) {
-    setSelectedBakery(bakery);
-    setView("map");
-    // 地図をそのパン屋にフォーカス
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const map = (window as any)._gopanMap;
-    if (map) {
-      map.setView([bakery.latitude, bakery.longitude], 16);
-    }
-  }
+  const toggleInterested = useCallback((id: number) => {
+    setInterested(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      localStorage.setItem(INTERESTED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
 
   function handleRegionToggle(region: string) {
     setSelectedRegions(prev =>
@@ -224,29 +217,43 @@ export default function Home() {
 
   const BakeryListItem = ({ bakery }: { bakery: Bakery }) => {
     const isBookmarked = bookmarks.has(bakery.id);
-    const isSelected = selectedBakery?.id === bakery.id;
+    const isInterested = interested.has(bakery.id);
     return (
-      <li
-        className={`px-4 py-3 ${isSelected ? "bg-red-50 border-l-4 border-red-400" : "bg-white hover:bg-amber-50"}`}
-      >
+      <li className={`px-4 py-3 ${isInterested ? "bg-red-50" : "bg-white"} hover:bg-amber-50`}>
         <div className="flex justify-between items-start">
-          <button
-            className="flex-1 text-left"
-            onClick={() => handleSelectBakery(bakery)}
-          >
-            <p className="font-medium text-amber-900 text-sm">
-              {isSelected ? "📍" : "🥐"} {bakery.name || "名称不明"}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-900 text-sm truncate">
+              🥐 {bakery.name || "名称不明"}
             </p>
             {bakery.distance != null && (
               <p className="text-xs text-amber-600 mt-0.5 font-medium">
-                {formatDistance(bakery.distance)}
+                📍 {formatDistance(bakery.distance)}
               </p>
             )}
-            {bakery.address && <p className="text-xs text-gray-500 mt-0.5">{bakery.address}</p>}
-            {bakery.opening_hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {bakery.opening_hours}</p>}
-          </button>
+            {bakery.address && <p className="text-xs text-gray-500 mt-0.5 truncate">{bakery.address}</p>}
+            {bakery.opening_hours && <p className="text-xs text-gray-400 mt-0.5 truncate">🕐 {bakery.opening_hours}</p>}
+          </div>
           <div className="flex items-center gap-2 ml-3 shrink-0">
-            <button onClick={() => toggleBookmark(bakery.id)}
+            {/* 気になる(赤丸) */}
+            <button
+              onClick={() => toggleInterested(bakery.id)}
+              style={{
+                width: "28px", height: "28px",
+                borderRadius: "50%",
+                border: `2px solid ${isInterested ? "#ef4444" : "#d1d5db"}`,
+                background: isInterested ? "#ef4444" : "white",
+                color: isInterested ? "white" : "#d1d5db",
+                fontSize: "14px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+              }}
+              title="気になる"
+            >
+              ♥
+            </button>
+            {/* お気に入り(星) */}
+            <button
+              onClick={() => toggleBookmark(bakery.id)}
               className={`text-xl ${isBookmarked ? "text-amber-400" : "text-gray-300"}`}
             >
               {isBookmarked ? "⭐" : "☆"}
@@ -292,9 +299,9 @@ export default function Home() {
               bakeries={bakeries}
               center={center}
               bookmarks={bookmarks}
+              interested={interested}
               onToggleBookmark={toggleBookmark}
-              selectedBakery={selectedBakery}
-              onSelectBakery={setSelectedBakery}
+              onToggleInterested={toggleInterested}
             />
           </div>
         ) : view === "bookmarks" ? (
@@ -320,7 +327,7 @@ export default function Home() {
               <>
                 {hasLocation && (
                   <p className="text-xs text-amber-700 text-center py-2 bg-amber-50 border-b border-amber-100">
-                    📍 現在地から近い順　タップで地図に表示
+                    📍 現在地から近い順　♥気になる　☆お気に入り
                   </p>
                 )}
                 <ul className="divide-y divide-amber-100">
