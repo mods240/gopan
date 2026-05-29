@@ -520,6 +520,45 @@ export default function Home() {
                 📤
               </button>
             )}
+            {/* LINE共有 */}
+            <a
+              href={}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                width: "28px", height: "28px",
+                borderRadius: "50%",
+                border: "2px solid #06C755",
+                background: "white",
+                color: "#06C755",
+                fontSize: "13px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                textDecoration: "none",
+              }}
+              title="LINEで共有"
+            >
+              L
+            </a>
+            {/* X投稿 */}
+            <a
+              href={}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                width: "28px", height: "28px",
+                borderRadius: "50%",
+                border: "2px solid #000",
+                background: "white",
+                color: "#000",
+                fontSize: "11px",
+                fontWeight: "bold",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                textDecoration: "none",
+              }}
+              title="Xに投稿"
+            >
+              𝕏
+            </a>
           </div>
         </div>
       </li>

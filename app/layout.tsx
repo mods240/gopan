@@ -11,7 +11,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "ゴパン - パン屋ナビ",
-  description: "全国のパン屋を地図で見つけるアプリ。現在地周辺のパン屋をすぐに発見。",
+  description: "全国のパン屋を地図で見つけるアプリ。助手席で見つけて運転手に届ける。",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -20,6 +20,28 @@ export const metadata: Metadata = {
   },
   icons: {
     apple: "/icon-192.png",
+  },
+  openGraph: {
+    title: "ゴパン🥐 - パン屋ナビ",
+    description: "全国のパン屋を地図で見つけるアプリ。助手席で見つけて運転手に届ける。",
+    url: "https://gopan.vercel.app",
+    siteName: "ゴパン",
+    images: [
+      {
+        url: "https://gopan.vercel.app/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "ゴパン - パン屋ナビ",
+      },
+    ],
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "ゴパン🥐 - パン屋ナビ",
+    description: "全国のパン屋を地図で見つけるアプリ。助手席で見つけて運転手に届ける。",
+    images: ["https://gopan.vercel.app/icon-512.png"],
   },
 };
 
