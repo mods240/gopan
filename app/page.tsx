@@ -673,6 +673,8 @@ export default function Home() {
               interested={interested}
               onToggleBookmark={toggleBookmark}
               onToggleInterested={toggleInterested}
+              onShareBakery={shareBakery}
+              pairId={pairId}
             />
           </div>
         ) : view === "bookmarks" ? (
