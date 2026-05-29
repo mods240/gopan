@@ -99,7 +99,7 @@ export default function Home() {
 
   // 近接アラート
   const [nearbyAlert, setNearbyAlert] = useState<Bakery | null>(null);
-  const notifiedRef = useRef<Map<number, number>>(new Map()); // id -> 通知時刻
+  const notifiedRef = useRef<Record<number, number>>({}); // id -> 通知時刻
   const bakeriesRef = useRef<Bakery[]>([]);
   const interestedRef = useRef<Set<number>>(new Set());
   const bookmarksRef = useRef<Set<number>>(new Set());
@@ -144,9 +144,9 @@ export default function Home() {
           if (!isInterested && !isBookmarked) continue;
           const dist = calcDistance(coords[0], coords[1], bakery.latitude, bakery.longitude);
           if (dist <= ALERT_RADIUS_KM) {
-            const lastNotified = notifiedRef.current.get(bakery.id) || 0;
+            const lastNotified = notifiedRef.current[bakery.id] || 0;
             if (now - lastNotified > COOLDOWN_MS) {
-              notifiedRef.current.set(bakery.id, now);
+              notifiedRef.current[bakery.id] = now;
               setNearbyAlert({ ...bakery, distance: dist });
               break;
             }
