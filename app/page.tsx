@@ -97,6 +97,90 @@ export default function Home() {
   const [initialized, setInitialized] = useState(false);
   const currentPosRef = useRef<[number, number] | null>(null);
 
+  // ペアリング
+  const [pairId, setPairId] = useState<string | null>(null);
+  const [showPairModal, setShowPairModal] = useState(false);
+  const [pairInput, setPairInput] = useState("");
+  const [receivedBakery, setReceivedBakery] = useState<Bakery | null>(null);
+  const pairIdRef = useRef<string | null>(null);
+
+  // pairIdをrefに同期
+  useEffect(() => { pairIdRef.current = pairId; }, [pairId]);
+
+  // ペアルーム作成
+  const createPair = async () => {
+    const newId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    await supabase.from('gopan_pairs').insert({ id: newId });
+    setPairId(newId);
+    localStorage.setItem('gopan_pair_id', newId);
+    subscribePair(newId);
+  };
+
+  // ペアルーム参加
+  const joinPair = async (id: string) => {
+    const trimmed = id.trim().toUpperCase();
+    const { data } = await supabase.from('gopan_pairs').select('id').eq('id', trimmed).single();
+    if (!data) { alert('ルームが見つかりません'); return; }
+    setPairId(trimmed);
+    localStorage.setItem('gopan_pair_id', trimmed);
+    subscribePair(trimmed);
+  };
+
+  // ペア解除
+  const leavePair = () => {
+    setPairId(null);
+    localStorage.removeItem('gopan_pair_id');
+    supabase.removeAllChannels();
+  };
+
+  // Realtime購読
+  const subscribePair = (id: string) => {
+    supabase.removeAllChannels();
+    supabase
+      .channel('pair-' + id)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'gopan_shared_bakeries',
+        filter: 'pair_id=eq.' + id,
+      }, (payload) => {
+        const row = payload.new as { bakery_id: number; bakery_name: string; latitude: number; longitude: number; address: string };
+        setReceivedBakery({
+          id: row.bakery_id,
+          name: row.bakery_name,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          address: row.address,
+          area: null,
+          opening_hours: null,
+          website: null,
+          region: null,
+        });
+      })
+      .subscribe();
+  };
+
+  // 店舗を送信
+  const shareBakery = async (bakery: Bakery) => {
+    if (!pairIdRef.current) { alert('ペアリングしてから送信してください'); return; }
+    await supabase.from('gopan_shared_bakeries').insert({
+      pair_id: pairIdRef.current,
+      bakery_id: bakery.id,
+      bakery_name: bakery.name,
+      latitude: bakery.latitude,
+      longitude: bakery.longitude,
+      address: bakery.address,
+    });
+    alert('📤 送信しました！');
+  };
+
+  // 起動時にペアを復元
+  useEffect(() => {
+    const saved = localStorage.getItem('gopan_pair_id');
+    if (saved) { setPairId(saved); subscribePair(saved); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 近接アラート
   const [nearbyAlert, setNearbyAlert] = useState<Bakery | null>(null);
   const notifiedRef = useRef<Record<number, number>>({}); // id -> 通知時刻
@@ -356,6 +440,25 @@ export default function Home() {
             >
               {isBookmarked ? "⭐" : "☆"}
             </button>
+            {/* ペアに送る */}
+            {pairId && (
+              <button
+                onClick={() => shareBakery(bakery)}
+                style={{
+                  width: "28px", height: "28px",
+                  borderRadius: "50%",
+                  border: "2px solid #f59e0b",
+                  background: "white",
+                  color: "#f59e0b",
+                  fontSize: "13px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer",
+                }}
+                title="ペアに送る"
+              >
+                📤
+              </button>
+            )}
           </div>
         </div>
       </li>
@@ -399,6 +502,31 @@ export default function Home() {
         </div>
       )}
 
+      {/* 受信バナー */}
+      {receivedBakery && (
+        <div
+          className="bg-amber-500 text-white px-4 py-3 flex items-center justify-between cursor-pointer shadow-lg"
+          onClick={() => {
+            setReceivedBakery(null);
+            setView("map");
+            setTimeout(() => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const map = (window as any)._gopanMap;
+              if (map) map.setView([receivedBakery.latitude, receivedBakery.longitude], 17);
+            }, 100);
+          }}
+        >
+          <div className="flex-1">
+            <p className="font-bold text-sm">📤 パン屋が送られてきました！</p>
+            <p className="text-xs mt-0.5 text-amber-100">{receivedBakery.name} — タップで地図を表示</p>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setReceivedBakery(null); }}
+            className="text-amber-200 text-lg ml-3"
+          >✕</button>
+        </div>
+      )}
+
       <div className="flex bg-white border-b border-amber-100">
         <button onClick={() => setView("map")}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${view === "map" ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"}`}
@@ -409,7 +537,66 @@ export default function Home() {
         <button onClick={() => setView("bookmarks")}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${view === "bookmarks" ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"}`}
         >⭐ {bookmarks.size > 0 ? bookmarks.size : ""}</button>
+        <button onClick={() => setShowPairModal(true)}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${pairId ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"}`}
+        >{pairId ? "🔗" : "🔗"}</button>
       </div>
+
+      {/* ペアリングモーダル */}
+      {showPairModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-lg font-bold text-amber-900 mb-1">🔗 ペアリング</h2>
+            <p className="text-xs text-gray-500 mb-4">同乗者とパン屋を共有できます</p>
+
+            {pairId ? (
+              <div>
+                <div className="bg-amber-50 rounded-xl p-4 mb-4 text-center">
+                  <p className="text-xs text-gray-500 mb-1">ルームコード</p>
+                  <p className="text-3xl font-bold tracking-widest text-amber-800">{pairId}</p>
+                  <p className="text-xs text-gray-400 mt-1">相手にこのコードを伝えてください</p>
+                </div>
+                <p className="text-xs text-center text-gray-500 mb-4">
+                  リストの 📤 ボタンでパン屋を送れます
+                </p>
+                <button
+                  onClick={() => { leavePair(); setShowPairModal(false); }}
+                  className="w-full py-2 rounded-xl border border-red-300 text-red-500 text-sm font-medium mb-2"
+                >ペアを解除する</button>
+                <button
+                  onClick={() => setShowPairModal(false)}
+                  className="w-full py-2 rounded-xl bg-amber-700 text-white text-sm font-bold"
+                >閉じる</button>
+              </div>
+            ) : (
+              <div>
+                <button
+                  onClick={() => { createPair(); setShowPairModal(false); }}
+                  className="w-full py-3 rounded-xl bg-amber-700 text-white font-bold mb-3"
+                >🆕 ルームを作成する</button>
+                <p className="text-xs text-center text-gray-400 mb-3">または</p>
+                <input
+                  type="text"
+                  value={pairInput}
+                  onChange={e => setPairInput(e.target.value.toUpperCase())}
+                  placeholder="コードを入力(例: AB1234)"
+                  className="w-full px-4 py-2 border border-amber-200 rounded-xl text-sm mb-2 focus:outline-none focus:border-amber-500 text-center tracking-widest font-bold"
+                  maxLength={6}
+                />
+                <button
+                  onClick={() => { joinPair(pairInput); setShowPairModal(false); }}
+                  disabled={pairInput.length < 4}
+                  className="w-full py-2 rounded-xl bg-amber-100 text-amber-800 text-sm font-bold mb-3 disabled:opacity-40"
+                >参加する</button>
+                <button
+                  onClick={() => setShowPairModal(false)}
+                  className="w-full py-2 rounded-xl border border-gray-200 text-gray-500 text-sm"
+                >キャンセル</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden">
         {loading || locating ? (
