@@ -180,7 +180,7 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
 
         <MarkerClusterGroup
           chunkedLoading
-          iconCreateFunction={(cluster) => createClusterIcon(cluster as Parameters<typeof createClusterIcon>[0], interested, bookmarks)}
+          iconCreateFunction={(cluster: { getChildCount: () => number; getAllChildMarkers: () => L.Marker[] }) => createClusterIcon(cluster, interested, bookmarks)}
           maxClusterRadius={60}
           showCoverageOnHover={false}
           zoomToBoundsOnClick={true}
