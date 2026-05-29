@@ -27,18 +27,35 @@ const starIcon = L.divIcon({
   className: "",
 });
 
+// 選択中(赤ピン)
+const selectedIcon = L.divIcon({
+  html: `<div style="position:relative">
+    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" style="width:30px;height:49px;filter:hue-rotate(140deg) saturate(3) brightness(1.1)"/>
+    <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:bold;white-space:nowrap">ここ!</div>
+  </div>`,
+  iconSize: [30, 49],
+  iconAnchor: [15, 49],
+  popupAnchor: [0, -49],
+  className: "",
+});
+
 const currentIcon = L.divIcon({
-  html: `<div style="
-    width:20px;height:20px;
-    background:#2563eb;
-    border:3px solid white;
-    border-radius:50%;
-    box-shadow:0 2px 8px rgba(37,99,235,0.6);
-  "></div>`,
+  html: `<div style="width:20px;height:20px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(37,99,235,0.6)"></div>`,
   iconSize: [20, 20],
   iconAnchor: [10, 10],
   className: "",
 });
+
+const createClusterIcon = (cluster: { getChildCount: () => number }) => {
+  const count = cluster.getChildCount();
+  const size = count < 10 ? 36 : count < 50 ? 42 : 50;
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;background:#92400e;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:${size < 40 ? 13 : 14}px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    className: "",
+  });
+};
 
 interface Bakery {
   id: number;
@@ -50,6 +67,7 @@ interface Bakery {
   opening_hours: string | null;
   website: string | null;
   region: string | null;
+  distance?: number;
 }
 
 interface MapProps {
@@ -57,6 +75,8 @@ interface MapProps {
   center: [number, number];
   bookmarks: Set<number>;
   onToggleBookmark: (id: number) => void;
+  selectedBakery: Bakery | null;
+  onSelectBakery: (bakery: Bakery | null) => void;
 }
 
 function MapInit({ center }: { center: [number, number] }) {
@@ -86,34 +106,14 @@ function LocateButton({ center }: { center: [number, number] }) {
           fontSize: "20px", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
-      >
-        📍
-      </button>
+      >📍</button>
     </div>
   );
 }
 
-// クラスターアイコンのカスタマイズ
-const createClusterCustomIcon = (cluster: L.MarkerCluster) => {
-  const count = cluster.getChildCount();
-  const size = count < 10 ? 36 : count < 50 ? 42 : 50;
-  return L.divIcon({
-    html: `<div style="
-      width:${size}px;height:${size}px;
-      background:#92400e;
-      border:3px solid white;
-      border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      color:white;font-weight:bold;font-size:${size < 40 ? 13 : 14}px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.3);
-    ">${count}</div>`,
-    iconSize: [size, size],
-    iconAnchor: [size/2, size/2],
-    className: "",
-  });
-};
+export default function Map({ bakeries, center, bookmarks, onToggleBookmark, selectedBakery, onSelectBakery }: MapProps) {
+  const markerRefs = useRef<Map<number, L.Marker>>(new Map());
 
-export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: MapProps) {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -126,6 +126,15 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
     if (el) { el.style.transform = ''; el.style.transition = ''; }
   }, []);
 
+  // 選択されたパン屋のポップアップを自動で開く
+  useEffect(() => {
+    if (!selectedBakery) return;
+    const marker = markerRefs.current.get(selectedBakery.id);
+    if (marker) {
+      setTimeout(() => marker.openPopup(), 300);
+    }
+  }, [selectedBakery]);
+
   return (
     <div style={{ position: "relative", height: "100%", width: "100%" }}>
       <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }}>
@@ -136,31 +145,44 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
         <MapInit center={center} />
         <LocateButton center={center} />
 
-        {/* 現在地マーカー */}
         <Marker position={center} icon={currentIcon}>
           <Popup>📍 現在地</Popup>
         </Marker>
 
-        {/* クラスタリング付きパン屋マーカー */}
         <MarkerClusterGroup
           chunkedLoading
-          iconCreateFunction={createClusterCustomIcon}
+          iconCreateFunction={createClusterIcon}
           maxClusterRadius={60}
           showCoverageOnHover={false}
           zoomToBoundsOnClick={true}
           spiderfyOnMaxZoom={true}
+          disableClusteringAtZoom={16}
         >
           {bakeries.map((bakery) => {
             const isBookmarked = bookmarks.has(bakery.id);
+            const isSelected = selectedBakery?.id === bakery.id;
+            const icon = isSelected ? selectedIcon : isBookmarked ? starIcon : defaultIcon;
+
             return (
               <Marker
                 key={bakery.id}
                 position={[bakery.latitude, bakery.longitude]}
-                icon={isBookmarked ? starIcon : defaultIcon}
+                icon={icon}
+                ref={(ref) => {
+                  if (ref) markerRefs.current.set(bakery.id, ref);
+                }}
+                eventHandlers={{
+                  click: () => onSelectBakery(bakery),
+                }}
               >
                 <Popup>
                   <div className="text-sm" style={{ minWidth: "160px" }}>
                     <p className="font-bold text-amber-900">🥐 {bakery.name || "名称不明"}</p>
+                    {bakery.distance != null && (
+                      <p className="text-amber-600 text-xs mt-0.5 font-medium">
+                        📍 {bakery.distance < 1 ? `${Math.round(bakery.distance * 1000)}m` : `${bakery.distance.toFixed(1)}km`}
+                      </p>
+                    )}
                     {bakery.address && <p className="text-gray-600 text-xs mt-0.5">{bakery.address}</p>}
                     {bakery.opening_hours && (
                       <p className="text-gray-500 text-xs mt-1">🕐 {bakery.opening_hours}</p>
