@@ -107,6 +107,15 @@ export default function Home() {
   // pairIdをrefに同期
   useEffect(() => { pairIdRef.current = pairId; }, [pairId]);
 
+  // 自分のsenderIdを生成(初回のみ)
+  const senderIdRef = useRef<string>(
+    localStorage.getItem('gopan_sender_id') || (() => {
+      const id = Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('gopan_sender_id', id);
+      return id;
+    })()
+  );
+
   // ペアルーム作成
   const createPair = async () => {
     const newId = Math.random().toString(36).substring(2, 8).toLowerCase();
@@ -170,6 +179,8 @@ export default function Home() {
       if (data && data.length > 0) {
         const row = data[0];
         lastReceivedIdRef.current = row.id;
+        // 自分が送ったものは無視
+        if (row.sender_id === senderIdRef.current) return;
         setReceivedBakery({
           id: row.bakery_id,
           name: row.bakery_name,
@@ -197,6 +208,7 @@ export default function Home() {
       latitude: bakery.latitude,
       longitude: bakery.longitude,
       address: bakery.address,
+      sender_id: senderIdRef.current,
     });
     if (error) {
       console.error('送信エラー:', JSON.stringify(error));
