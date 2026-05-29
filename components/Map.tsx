@@ -115,7 +115,7 @@ function LocateButton({ center }: { center: [number, number] }) {
 }
 
 export default function Map({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested }: MapProps) {
-  const markerRefs = useRef<Map<number, L.Marker>>(new Map());
+  const markerRefs = useRef<Record<number, L.Marker>>({});
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -165,7 +165,7 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
                 position={[bakery.latitude, bakery.longitude]}
                 icon={icon}
                 ref={(ref) => {
-                  if (ref) markerRefs.current.set(bakery.id, ref);
+                  if (ref) markerRefs.current[bakery.id] = ref;
                 }}
               >
                 <Popup>
