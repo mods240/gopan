@@ -102,10 +102,12 @@ export default function Home() {
   const notifiedRef = useRef<Map<number, number>>(new Map()); // id -> 通知時刻
   const bakeriesRef = useRef<Bakery[]>([]);
   const interestedRef = useRef<Set<number>>(new Set());
+  const bookmarksRef = useRef<Set<number>>(new Set());
 
-  // bakeriesとinterestedの最新値をrefに同期
+  // bakeries・interested・bookmarksの最新値をrefに同期
   useEffect(() => { bakeriesRef.current = bakeries; }, [bakeries]);
   useEffect(() => { interestedRef.current = interested; }, [interested]);
+  useEffect(() => { bookmarksRef.current = bookmarks; }, [bookmarks]);
 
   useEffect(() => {
     if (!navigator.geolocation) { setLocating(false); return; }
@@ -131,20 +133,22 @@ export default function Home() {
         setCenter(coords);
         currentPosRef.current = coords;
 
-        // 気になる店の近接チェック
+        // 気になる・お気に入り店の近接チェック
         const now = Date.now();
-        const ALERT_RADIUS_KM = 0.5; // 500m
-        const COOLDOWN_MS = 60 * 60 * 1000; // 1時間
+        const ALERT_RADIUS_KM = 2.0; // テスト用2km(後で0.5に戻す)
+        const COOLDOWN_MS = 1 * 60 * 1000; // テスト用1分(後で1時間に戻す)
 
         for (const bakery of bakeriesRef.current) {
-          if (!interestedRef.current.has(bakery.id)) continue;
+          const isInterested = interestedRef.current.has(bakery.id);
+          const isBookmarked = bookmarksRef.current.has(bakery.id);
+          if (!isInterested && !isBookmarked) continue;
           const dist = calcDistance(coords[0], coords[1], bakery.latitude, bakery.longitude);
           if (dist <= ALERT_RADIUS_KM) {
             const lastNotified = notifiedRef.current.get(bakery.id) || 0;
             if (now - lastNotified > COOLDOWN_MS) {
               notifiedRef.current.set(bakery.id, now);
               setNearbyAlert({ ...bakery, distance: dist });
-              break; // 一度に1件だけ通知
+              break;
             }
           }
         }
