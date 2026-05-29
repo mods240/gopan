@@ -440,7 +440,7 @@ export default function Home() {
               selectedRegions.length > 0 ? "bg-amber-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {selectedRegions.length > 0 ? `${selectedRegions.join('・')}で始める 🥐` : "エリアを選んでください"}
+            {selectedRegions.length > 0 ? `${selectedRegions.join("・")}で始める 🥐` : "エリアを選んでください"}
           </button>
         </div>
       </div>
