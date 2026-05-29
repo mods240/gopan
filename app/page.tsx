@@ -190,7 +190,8 @@ export default function Home() {
               const row = newData[0];
               lastReceivedIdRef.current = row.id;
               // 自分が送ったものは無視
-              if (row.sender_id !== senderIdRef.current) {
+              const mySenderId = senderIdRef.current || localStorage.getItem('gopan_sender_id') || '';
+              if (row.sender_id !== mySenderId) {
                 setReceivedBakery({
                   id: row.bakery_id,
                   name: row.bakery_name,
@@ -216,6 +217,7 @@ export default function Home() {
   // 店舗を送信
   const shareBakery = async (bakery: Bakery) => {
     if (!pairIdRef.current) { alert('ペアリングしてから送信してください'); return; }
+    const senderId = senderIdRef.current || localStorage.getItem('gopan_sender_id') || '';
     const { error } = await supabase.from('gopan_shared_bakeries').insert({
       pair_id: pairIdRef.current,
       bakery_id: bakery.id,
@@ -223,7 +225,7 @@ export default function Home() {
       latitude: bakery.latitude,
       longitude: bakery.longitude,
       address: bakery.address,
-      sender_id: senderIdRef.current,
+      sender_id: senderId,
     });
     if (error) {
       console.error('送信エラー:', JSON.stringify(error));
