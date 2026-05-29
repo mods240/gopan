@@ -84,6 +84,7 @@ export default function Home() {
   const [bakeries, setBakeries] = useState<Bakery[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [sortedRegions, setSortedRegions] = useState(ALL_REGIONS);
+  const [searchQuery, setSearchQuery] = useState("");
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [interested, setInterested] = useState<Set<number>>(new Set());
   const [showRegionSelect, setShowRegionSelect] = useState(false);
@@ -191,6 +192,14 @@ export default function Home() {
     if (b.distance != null) return 1;
     return (a.name || '').localeCompare(b.name || '');
   });
+
+  // 検索フィルタ
+  const searchedBakeries = searchQuery.trim()
+    ? sortedBakeries.filter(b =>
+        (b.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (b.address || '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : sortedBakeries;
 
   const bookmarkedBakeries = sortedBakeries.filter(b => bookmarks.has(b.id));
 
@@ -349,30 +358,62 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <div className="h-full overflow-y-auto">
-            {sortedBakeries.length === 0 ? (
-              <div className="flex items-center justify-center h-40">
-                <p className="text-gray-500 text-sm">パン屋が見つかりません</p>
-              </div>
-            ) : (
-              <>
-                {hasLocation && (
-                  <p className="text-xs text-amber-700 text-center py-2 bg-amber-50 border-b border-amber-100">
-                    📍 現在地から近い順　♥気になる　☆お気に入り
-                  </p>
+          <div className="h-full flex flex-col overflow-hidden">
+            {/* 検索バー */}
+            <div className="px-3 py-2 bg-white border-b border-amber-100">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="店舗名・住所で検索..."
+                  className="w-full pl-8 pr-8 py-2 text-sm border border-amber-200 rounded-full bg-amber-50 focus:outline-none focus:border-amber-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"
+                  >✕</button>
                 )}
-                <ul className="divide-y divide-amber-100">
-                  {sortedBakeries.map(bakery => <BakeryListItem key={bakery.id} bakery={bakery} />)}
-                </ul>
-                <p className="text-xs text-gray-400 text-center py-4 px-4">
-                  位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。<br/>
-                  ⭐♥の登録はこの端末のブラウザに保存されます。キャッシュ削除で消える場合があります。<br/>
-                  <a href="/about" className="text-amber-600 underline mt-1 inline-block">
-                    📋 プライバシーポリシー・免責事項
-                  </a>
-                </p>
-              </>
-            )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {searchedBakeries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-2">
+                  <p className="text-gray-500 text-sm">
+                    {searchQuery ? `「${searchQuery}」は見つかりませんでした` : "パン屋が見つかりません"}
+                  </p>
+                  {searchQuery && (
+                    <p className="text-gray-400 text-xs">別のエリアも選択してみてください</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {!searchQuery && hasLocation && (
+                    <p className="text-xs text-amber-700 text-center py-2 bg-amber-50 border-b border-amber-100">
+                      📍 現在地から近い順　♥気になる　☆お気に入り
+                    </p>
+                  )}
+                  {searchQuery && (
+                    <p className="text-xs text-amber-700 text-center py-2 bg-amber-50 border-b border-amber-100">
+                      🔍 「{searchQuery}」の検索結果 {searchedBakeries.length}件
+                    </p>
+                  )}
+                  <ul className="divide-y divide-amber-100">
+                    {searchedBakeries.map(bakery => <BakeryListItem key={bakery.id} bakery={bakery} />)}
+                  </ul>
+                  <p className="text-xs text-gray-400 text-center py-4 px-4">
+                    位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。<br/>
+                    ⭐♥の登録はこの端末のブラウザに保存されます。キャッシュ削除で消える場合があります。<br/>
+                    <a href="/about" className="text-amber-600 underline mt-1 inline-block">
+                      📋 プライバシーポリシー・免責事項
+                    </a>
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
