@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -92,6 +93,26 @@ function LocateButton({ center }: { center: [number, number] }) {
   );
 }
 
+// クラスターアイコンのカスタマイズ
+const createClusterCustomIcon = (cluster: L.MarkerCluster) => {
+  const count = cluster.getChildCount();
+  const size = count < 10 ? 36 : count < 50 ? 42 : 50;
+  return L.divIcon({
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:#92400e;
+      border:3px solid white;
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      color:white;font-weight:bold;font-size:${size < 40 ? 13 : 14}px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    ">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    className: "",
+  });
+};
+
 export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: MapProps) {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,7 +122,6 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
       iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
       shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     });
-    // 地図回転を解除
     const el = document.querySelector('.leaflet-container') as HTMLElement;
     if (el) { el.style.transform = ''; el.style.transition = ''; }
   }, []);
@@ -121,46 +141,55 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark }: M
           <Popup>📍 現在地</Popup>
         </Marker>
 
-        {/* パン屋マーカー */}
-        {bakeries.map((bakery) => {
-          const isBookmarked = bookmarks.has(bakery.id);
-          return (
-            <Marker
-              key={bakery.id}
-              position={[bakery.latitude, bakery.longitude]}
-              icon={isBookmarked ? starIcon : defaultIcon}
-            >
-              <Popup>
-                <div className="text-sm" style={{ minWidth: "160px" }}>
-                  <p className="font-bold text-amber-900">🥐 {bakery.name || "名称不明"}</p>
-                  {bakery.address && <p className="text-gray-600 text-xs mt-0.5">{bakery.address}</p>}
-                  {bakery.opening_hours && (
-                    <p className="text-gray-500 text-xs mt-1">🕐 {bakery.opening_hours}</p>
-                  )}
-                  <button
-                    onClick={() => onToggleBookmark(bakery.id)}
-                    style={{
-                      width: "100%", marginTop: "8px", padding: "4px",
-                      background: isBookmarked ? "#fef3c7" : "#f5f5f5",
-                      border: `1px solid ${isBookmarked ? "#f59e0b" : "#ddd"}`,
-                      borderRadius: "4px", cursor: "pointer", fontSize: "12px",
-                    }}
-                  >
-                    {isBookmarked ? "⭐ お気に入り済み" : "☆ お気に入りに追加"}
-                  </button>
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block mt-2 text-center bg-amber-600 text-white text-xs py-1 px-2 rounded"
-                  >
-                    🗺️ Google Maps で開く
-                  </a>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {/* クラスタリング付きパン屋マーカー */}
+        <MarkerClusterGroup
+          chunkedLoading
+          iconCreateFunction={createClusterCustomIcon}
+          maxClusterRadius={60}
+          showCoverageOnHover={false}
+          zoomToBoundsOnClick={true}
+          spiderfyOnMaxZoom={true}
+        >
+          {bakeries.map((bakery) => {
+            const isBookmarked = bookmarks.has(bakery.id);
+            return (
+              <Marker
+                key={bakery.id}
+                position={[bakery.latitude, bakery.longitude]}
+                icon={isBookmarked ? starIcon : defaultIcon}
+              >
+                <Popup>
+                  <div className="text-sm" style={{ minWidth: "160px" }}>
+                    <p className="font-bold text-amber-900">🥐 {bakery.name || "名称不明"}</p>
+                    {bakery.address && <p className="text-gray-600 text-xs mt-0.5">{bakery.address}</p>}
+                    {bakery.opening_hours && (
+                      <p className="text-gray-500 text-xs mt-1">🕐 {bakery.opening_hours}</p>
+                    )}
+                    <button
+                      onClick={() => onToggleBookmark(bakery.id)}
+                      style={{
+                        width: "100%", marginTop: "8px", padding: "4px",
+                        background: isBookmarked ? "#fef3c7" : "#f5f5f5",
+                        border: `1px solid ${isBookmarked ? "#f59e0b" : "#ddd"}`,
+                        borderRadius: "4px", cursor: "pointer", fontSize: "12px",
+                      }}
+                    >
+                      {isBookmarked ? "⭐ お気に入り済み" : "☆ お気に入りに追加"}
+                    </button>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block mt-2 text-center bg-amber-600 text-white text-xs py-1 px-2 rounded"
+                    >
+                      🗺️ Google Maps で開く
+                    </a>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MarkerClusterGroup>
       </MapContainer>
     </div>
   );
