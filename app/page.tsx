@@ -201,8 +201,10 @@ export default function Home() {
           <p className="text-xs text-gray-400 text-center mt-6">
             パン屋の位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用しています。情報が古い・不正確な場合があります。
           </p>
-          <p className="text-xs text-gray-400 text-center mt-2">
-            ⭐お気に入り・♥気になるはこの端末のブラウザに保存されます。ブラウザのデータ削除やキャッシュクリアを行うと消える場合があります。
+          <p className="text-xs text-center mt-2">
+            <a href="/about" className="text-amber-600 underline">
+              📋 プライバシーポリシー・免責事項・ご注意
+            </a>
           </p>
         </div>
         <div className="sticky bottom-0 p-4 bg-amber-50 border-t border-amber-200">
@@ -338,7 +340,10 @@ export default function Home() {
                 </ul>
                 <p className="text-xs text-gray-400 text-center py-4 px-4">
                   位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。<br/>
-                  ⭐♥の登録はこの端末のブラウザに保存されます。キャッシュ削除で消える場合があります。
+                  ⭐♥の登録はこの端末のブラウザに保存されます。キャッシュ削除で消える場合があります。<br/>
+                  <a href="/about" className="text-amber-600 underline mt-1 inline-block">
+                    📋 プライバシーポリシー・免責事項
+                  </a>
                 </p>
               </>
             )}
