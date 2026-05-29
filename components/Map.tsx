@@ -296,7 +296,7 @@ https://gopan.vercel.app`)}`}
                           textAlign: "center", textDecoration: "none", fontWeight: "bold",
                         }}
                       >
-                        𝕏 投稿
+                        X 投稿
                       </a>
                     </div>
                   </div>
