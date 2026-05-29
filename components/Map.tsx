@@ -268,6 +268,37 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
                     >
                       🗺️ Google Maps で開く
                     </a>
+                    <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+                      <a
+                        href={`https://line.me/R/share?text=${encodeURIComponent(`🥐 ${bakery.name}
+${bakery.address || ""}
+https://gopan.vercel.app`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1, padding: "4px", background: "#06C755",
+                          borderRadius: "4px", fontSize: "12px", color: "white",
+                          textAlign: "center", textDecoration: "none", fontWeight: "bold",
+                        }}
+                      >
+                        LINE
+                      </a>
+                      <a
+                        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🥐 ${bakery.name} に行ってきた！
+${bakery.address || ""}
+#ゴパン #パン活
+https://gopan.vercel.app`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1, padding: "4px", background: "#000",
+                          borderRadius: "4px", fontSize: "12px", color: "white",
+                          textAlign: "center", textDecoration: "none", fontWeight: "bold",
+                        }}
+                      >
+                        𝕏 投稿
+                      </a>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
