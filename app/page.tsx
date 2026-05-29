@@ -201,6 +201,9 @@ export default function Home() {
           <p className="text-xs text-gray-400 text-center mt-6">
             パン屋の位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用しています。情報が古い・不正確な場合があります。
           </p>
+          <p className="text-xs text-gray-400 text-center mt-2">
+            ⭐お気に入り・♥気になるはこの端末のブラウザに保存されます。ブラウザのデータ削除やキャッシュクリアを行うと消える場合があります。
+          </p>
         </div>
         <div className="sticky bottom-0 p-4 bg-amber-50 border-t border-amber-200">
           <button onClick={handleRegionConfirm} disabled={selectedRegions.length === 0}
@@ -334,7 +337,8 @@ export default function Home() {
                   {sortedBakeries.map(bakery => <BakeryListItem key={bakery.id} bakery={bakery} />)}
                 </ul>
                 <p className="text-xs text-gray-400 text-center py-4 px-4">
-                  位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。
+                  位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。<br/>
+                  ⭐♥の登録はこの端末のブラウザに保存されます。キャッシュ削除で消える場合があります。
                 </p>
               </>
             )}
