@@ -562,7 +562,7 @@ https://gopan.vercel.app")}
               }}
               title="Xに投稿"
             >
-              𝕏
+              X
             </a>
           </div>
         </div>
