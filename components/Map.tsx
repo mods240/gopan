@@ -51,11 +51,23 @@ const currentIcon = L.divIcon({
 
 const createClusterIcon = (cluster: { getChildCount: () => number }) => {
   const count = cluster.getChildCount();
-  const size = count < 10 ? 36 : count < 50 ? 42 : 50;
   return L.divIcon({
-    html: `<div style="width:${size}px;height:${size}px;background:#92400e;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:${size < 40 ? 13 : 14}px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${count}</div>`,
-    iconSize: [size, size],
-    iconAnchor: [size/2, size/2],
+    html: `<div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center">
+      <span style="font-size:34px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3))">🥐</span>
+      <div style="
+        position:absolute;top:0;right:0;
+        min-width:18px;height:18px;
+        background:#92400e;color:white;
+        border:2px solid white;
+        border-radius:9px;
+        font-size:10px;font-weight:bold;
+        display:flex;align-items:center;justify-content:center;
+        padding:0 3px;
+        box-shadow:0 1px 3px rgba(0,0,0,0.3);
+      ">${count}</div>
+    </div>`,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
     className: "",
   });
 };
