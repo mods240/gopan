@@ -77,9 +77,9 @@ interface MapProps {
   bakeries: Bakery[];
   center: [number, number];
   bookmarks: Set<number>;
+  interested: Set<number>;
   onToggleBookmark: (id: number) => void;
-  selectedBakery: Bakery | null;
-  onSelectBakery: (bakery: Bakery | null) => void;
+  onToggleInterested: (id: number) => void;
 }
 
 function MapInit({ center }: { center: [number, number] }) {
@@ -114,7 +114,7 @@ function LocateButton({ center }: { center: [number, number] }) {
   );
 }
 
-export default function Map({ bakeries, center, bookmarks, onToggleBookmark, selectedBakery, onSelectBakery }: MapProps) {
+export default function Map({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested }: MapProps) {
   const markerRefs = useRef<Map<number, L.Marker>>(new Map());
 
   useEffect(() => {
@@ -129,14 +129,7 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark, sel
     if (el) { el.style.transform = ''; el.style.transition = ''; }
   }, []);
 
-  // 選択されたパン屋のポップアップを自動で開く
-  useEffect(() => {
-    if (!selectedBakery) return;
-    const marker = markerRefs.current.get(selectedBakery.id);
-    if (marker) {
-      setTimeout(() => marker.openPopup(), 300);
-    }
-  }, [selectedBakery]);
+
 
   return (
     <div style={{ position: "relative", height: "100%", width: "100%" }}>
@@ -163,8 +156,8 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark, sel
         >
           {bakeries.map((bakery) => {
             const isBookmarked = bookmarks.has(bakery.id);
-            const isSelected = selectedBakery?.id === bakery.id;
-            const icon = isSelected ? selectedIcon : isBookmarked ? starIcon : defaultIcon;
+            const isInterested = interested.has(bakery.id);
+            const icon = isInterested ? selectedIcon : isBookmarked ? starIcon : defaultIcon;
 
             return (
               <Marker
@@ -173,9 +166,6 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark, sel
                 icon={icon}
                 ref={(ref) => {
                   if (ref) markerRefs.current.set(bakery.id, ref);
-                }}
-                eventHandlers={{
-                  click: () => onSelectBakery(bakery),
                 }}
               >
                 <Popup>
@@ -190,17 +180,31 @@ export default function Map({ bakeries, center, bookmarks, onToggleBookmark, sel
                     {bakery.opening_hours && (
                       <p className="text-gray-500 text-xs mt-1">🕐 {bakery.opening_hours}</p>
                     )}
-                    <button
-                      onClick={() => onToggleBookmark(bakery.id)}
-                      style={{
-                        width: "100%", marginTop: "8px", padding: "4px",
-                        background: isBookmarked ? "#fef3c7" : "#f5f5f5",
-                        border: `1px solid ${isBookmarked ? "#f59e0b" : "#ddd"}`,
-                        borderRadius: "4px", cursor: "pointer", fontSize: "12px",
-                      }}
-                    >
-                      {isBookmarked ? "⭐ お気に入り済み" : "☆ お気に入りに追加"}
-                    </button>
+                    <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                      <button
+                        onClick={() => onToggleInterested(bakery.id)}
+                        style={{
+                          flex: 1, padding: "4px",
+                          background: isInterested ? "#fee2e2" : "#f5f5f5",
+                          border: `1px solid ${isInterested ? "#ef4444" : "#ddd"}`,
+                          borderRadius: "4px", cursor: "pointer", fontSize: "12px",
+                          color: isInterested ? "#ef4444" : "#666",
+                        }}
+                      >
+                        {isInterested ? "♥ 気になる" : "♡ 気になる"}
+                      </button>
+                      <button
+                        onClick={() => onToggleBookmark(bakery.id)}
+                        style={{
+                          flex: 1, padding: "4px",
+                          background: isBookmarked ? "#fef3c7" : "#f5f5f5",
+                          border: `1px solid ${isBookmarked ? "#f59e0b" : "#ddd"}`,
+                          borderRadius: "4px", cursor: "pointer", fontSize: "12px",
+                        }}
+                      >
+                        {isBookmarked ? "⭐ お気に入り" : "☆ お気に入り"}
+                      </button>
+                    </div>
                     <a
                       href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
                       target="_blank"
