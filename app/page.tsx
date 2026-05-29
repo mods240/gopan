@@ -145,15 +145,20 @@ export default function Home() {
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
   };
 
-  // ポーリングで受信確認(3秒おき)
+  // ポーリングで受信確認(5秒おき)
   const lastReceivedIdRef = useRef<number>(0);
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isPollingRef = useRef<boolean>(false);
 
   const subscribePair = (id: string) => {
     // 既存のポーリングを停止
-    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    isPollingRef.current = false;
 
-    // 最新のIDを取得して基準点にする
+    // 最新のIDを取得して基準点にする(自分が送ったものも含めて既読扱い)
     supabase
       .from('gopan_shared_bakeries')
       .select('id')
@@ -164,36 +169,42 @@ export default function Home() {
         if (data && data.length > 0) {
           lastReceivedIdRef.current = data[0].id;
         }
+        // 基準点取得後にポーリング開始
+        pollingIntervalRef.current = setInterval(async () => {
+          if (isPollingRef.current) return; // 前のリクエストが終わっていない場合はスキップ
+          isPollingRef.current = true;
+          try {
+            const { data: newData } = await supabase
+              .from('gopan_shared_bakeries')
+              .select('*')
+              .eq('pair_id', id)
+              .gt('id', lastReceivedIdRef.current)
+              .order('id', { ascending: false })
+              .limit(1);
+
+            if (newData && newData.length > 0) {
+              const row = newData[0];
+              lastReceivedIdRef.current = row.id;
+              // 自分が送ったものは無視
+              if (row.sender_id !== senderIdRef.current) {
+                setReceivedBakery({
+                  id: row.bakery_id,
+                  name: row.bakery_name,
+                  latitude: row.latitude,
+                  longitude: row.longitude,
+                  address: row.address,
+                  area: null,
+                  opening_hours: null,
+                  website: null,
+                  region: null,
+                });
+              }
+            }
+          } finally {
+            isPollingRef.current = false;
+          }
+        }, 5000);
       });
-
-    // 3秒おきにポーリング
-    pollingIntervalRef.current = setInterval(async () => {
-      const { data } = await supabase
-        .from('gopan_shared_bakeries')
-        .select('*')
-        .eq('pair_id', id)
-        .gt('id', lastReceivedIdRef.current)
-        .order('id', { ascending: false })
-        .limit(1);
-
-      if (data && data.length > 0) {
-        const row = data[0];
-        lastReceivedIdRef.current = row.id;
-        // 自分が送ったものは無視
-        if (row.sender_id === senderIdRef.current) return;
-        setReceivedBakery({
-          id: row.bakery_id,
-          name: row.bakery_name,
-          latitude: row.latitude,
-          longitude: row.longitude,
-          address: row.address,
-          area: null,
-          opening_hours: null,
-          website: null,
-          region: null,
-        });
-      }
-    }, 3000);
 
     console.log('Polling started for pair:', id);
   };
