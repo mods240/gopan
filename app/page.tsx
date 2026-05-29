@@ -38,7 +38,28 @@ const ALL_REGIONS = [
   { name: '沖縄', emoji: '🌺', desc: '沖縄全島' },
 ];
 
-const STORAGE_KEY = 'gopan_selected_regions';
+// リージョンの中心座標(近い順に並び替えるため)
+const REGION_CENTERS: Record<string, [number, number]> = {
+  '関東':     [35.68, 139.69],
+  '関西':     [34.69, 135.50],
+  '中京':     [35.18, 136.91],
+  '北海道':   [43.06, 141.35],
+  '東北':     [38.27, 140.87],
+  '北陸・信越': [36.69, 137.21],
+  '中国・四国': [34.40, 132.46],
+  '九州':     [33.59, 130.42],
+  '沖縄':     [26.21, 127.68],
+};
+
+function sortRegionsByLocation(lat: number, lng: number) {
+  return [...ALL_REGIONS].sort((a, b) => {
+    const [aLat, aLng] = REGION_CENTERS[a.name] || [35, 135];
+    const [bLat, bLng] = REGION_CENTERS[b.name] || [35, 135];
+    const distA = Math.sqrt((lat - aLat) ** 2 + (lng - aLng) ** 2);
+    const distB = Math.sqrt((lat - bLat) ** 2 + (lng - bLng) ** 2);
+    return distA - distB;
+  });
+}
 const BOOKMARK_KEY = 'gopan_bookmarks';
 const INTERESTED_KEY = 'gopan_interested';
 const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
@@ -62,6 +83,7 @@ function formatDistance(km: number): string {
 export default function Home() {
   const [bakeries, setBakeries] = useState<Bakery[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [sortedRegions, setSortedRegions] = useState(ALL_REGIONS);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [interested, setInterested] = useState<Set<number>>(new Set());
   const [showRegionSelect, setShowRegionSelect] = useState(false);
@@ -82,6 +104,8 @@ export default function Home() {
         setHasLocation(true);
         setLocating(false);
         currentPosRef.current = coords;
+        // 現在地に近い順にリージョンを並び替え
+        setSortedRegions(sortRegionsByLocation(coords[0], coords[1]));
       },
       () => setLocating(false),
       { timeout: 10000, maximumAge: 60000 }
@@ -187,7 +211,7 @@ export default function Home() {
             <p className="text-xs text-gray-500 mt-1">ご利用前にご確認ください</p>
           </div>
           <div className="grid grid-cols-1 gap-3">
-            {ALL_REGIONS.map(region => {
+            {sortedRegions.map(region => {
               const isSelected = selectedRegions.includes(region.name);
               return (
                 <button key={region.name} onClick={() => handleRegionToggle(region.name)}
