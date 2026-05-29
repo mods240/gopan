@@ -133,21 +133,43 @@ export default function Home() {
   const leavePair = () => {
     setPairId(null);
     localStorage.removeItem('gopan_pair_id');
-    supabase.removeAllChannels();
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
   };
 
-  // Realtime購読
+  // ポーリングで受信確認(3秒おき)
+  const lastReceivedIdRef = useRef<number>(0);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const subscribePair = (id: string) => {
-    const channel = supabase
-      .channel('pair-' + id)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'gopan_shared_bakeries',
-      }, (payload) => {
-        const row = payload.new as { pair_id: string; bakery_id: number; bakery_name: string; latitude: number; longitude: number; address: string };
-        // pair_idが一致する場合のみ処理
-        if (row.pair_id !== id) return;
+    // 既存のポーリングを停止
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+
+    // 最新のIDを取得して基準点にする
+    supabase
+      .from('gopan_shared_bakeries')
+      .select('id')
+      .eq('pair_id', id)
+      .order('id', { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          lastReceivedIdRef.current = data[0].id;
+        }
+      });
+
+    // 3秒おきにポーリング
+    pollingIntervalRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('gopan_shared_bakeries')
+        .select('*')
+        .eq('pair_id', id)
+        .gt('id', lastReceivedIdRef.current)
+        .order('id', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const row = data[0];
+        lastReceivedIdRef.current = row.id;
         setReceivedBakery({
           id: row.bakery_id,
           name: row.bakery_name,
@@ -159,11 +181,10 @@ export default function Home() {
           website: null,
           region: null,
         });
-      })
-      .subscribe((status) => {
-        console.log('Realtime status:', status);
-      });
-    console.log('Subscribed to channel:', channel);
+      }
+    }, 3000);
+
+    console.log('Polling started for pair:', id);
   };
 
   // 店舗を送信
