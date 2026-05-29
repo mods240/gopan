@@ -27,14 +27,14 @@ interface Bakery {
 }
 
 const ALL_REGIONS = [
-  { name: '関西', emoji: '🏯', desc: '大阪・京都・兵庫・奈良など' },
   { name: '関東', emoji: '🗼', desc: '東京・神奈川・埼玉・千葉など' },
+  { name: '関西', emoji: '🏯', desc: '大阪・京都・兵庫・奈良など' },
   { name: '中京', emoji: '🏙️', desc: '愛知・岐阜・三重・静岡' },
+  { name: '北海道', emoji: '🐻', desc: '北海道全域' },
   { name: '東北', emoji: '⛄', desc: '宮城・福島・青森・岩手など' },
   { name: '北陸・信越', emoji: '🦀', desc: '新潟・長野・富山・石川・福井' },
   { name: '中国・四国', emoji: '🍋', desc: '広島・岡山・香川・愛媛など' },
   { name: '九州', emoji: '🌋', desc: '福岡・熊本・鹿児島・長崎など' },
-  { name: '北海道', emoji: '🐻', desc: '北海道全域' },
   { name: '沖縄', emoji: '🌺', desc: '沖縄全島' },
 ];
 
@@ -179,6 +179,13 @@ export default function Home() {
         </header>
         <div className="flex-1 px-4 py-4">
           <p className="text-xs text-gray-500 mb-4 text-center">複数選択できます。後から変更も可能です。</p>
+          {/* プライバシーポリシーを上部に */}
+          <div className="bg-amber-100 rounded-lg px-4 py-3 mb-4 text-center">
+            <a href="/about" className="text-amber-700 text-xs underline font-medium">
+              📋 プライバシーポリシー・免責事項・ご注意
+            </a>
+            <p className="text-xs text-gray-500 mt-1">ご利用前にご確認ください</p>
+          </div>
           <div className="grid grid-cols-1 gap-3">
             {ALL_REGIONS.map(region => {
               const isSelected = selectedRegions.includes(region.name);
@@ -198,13 +205,8 @@ export default function Home() {
               );
             })}
           </div>
-          <p className="text-xs text-gray-400 text-center mt-6">
-            パン屋の位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用しています。情報が古い・不正確な場合があります。
-          </p>
-          <p className="text-xs text-center mt-2">
-            <a href="/about" className="text-amber-600 underline">
-              📋 プライバシーポリシー・免責事項・ご注意
-            </a>
+          <p className="text-xs text-gray-400 text-center mt-4">
+            位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用しています。
           </p>
         </div>
         <div className="sticky bottom-0 p-4 bg-amber-50 border-t border-amber-200">
