@@ -110,17 +110,20 @@ export default function Home() {
   // ペアルーム作成
   const createPair = async () => {
     const newId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    await supabase.from('gopan_pairs').insert({ id: newId });
+    const { error } = await supabase.from('gopan_pairs').insert({ id: newId });
+    if (error) { alert('ルーム作成に失敗しました: ' + error.message); return; }
     setPairId(newId);
     localStorage.setItem('gopan_pair_id', newId);
     subscribePair(newId);
+    // モーダルは閉じない(コードを表示したまま)
   };
 
   // ペアルーム参加
   const joinPair = async (id: string) => {
     const trimmed = id.trim().toUpperCase();
-    const { data } = await supabase.from('gopan_pairs').select('id').eq('id', trimmed).single();
-    if (!data) { alert('ルームが見つかりません'); return; }
+    const { data, error } = await supabase.from('gopan_pairs').select('id').eq('id', trimmed).maybeSingle();
+    console.log('joinPair', trimmed, data, error);
+    if (!data) { alert('ルームが見つかりません。コードを確認してください。'); return; }
     setPairId(trimmed);
     localStorage.setItem('gopan_pair_id', trimmed);
     subscribePair(trimmed);
@@ -571,7 +574,7 @@ export default function Home() {
             ) : (
               <div>
                 <button
-                  onClick={() => { createPair(); setShowPairModal(false); }}
+                  onClick={() => { createPair(); }}
                   className="w-full py-3 rounded-xl bg-amber-700 text-white font-bold mb-3"
                 >🆕 ルームを作成する</button>
                 <p className="text-xs text-center text-gray-400 mb-3">または</p>
