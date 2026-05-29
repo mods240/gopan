@@ -135,8 +135,8 @@ export default function Home() {
 
         // 気になる・お気に入り店の近接チェック
         const now = Date.now();
-        const ALERT_RADIUS_KM = 2.0; // テスト用2km(後で0.5に戻す)
-        const COOLDOWN_MS = 1 * 60 * 1000; // テスト用1分(後で1時間に戻す)
+        const ALERT_RADIUS_KM = 0.5; // 500m
+        const COOLDOWN_MS = 3 * 60 * 1000; // 3分
 
         for (const bakery of bakeriesRef.current) {
           const isInterested = interestedRef.current.has(bakery.id);
