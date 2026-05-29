@@ -97,8 +97,20 @@ export default function Home() {
   const [initialized, setInitialized] = useState(false);
   const currentPosRef = useRef<[number, number] | null>(null);
 
+  // 近接アラート
+  const [nearbyAlert, setNearbyAlert] = useState<Bakery | null>(null);
+  const notifiedRef = useRef<Map<number, number>>(new Map()); // id -> 通知時刻
+  const bakeriesRef = useRef<Bakery[]>([]);
+  const interestedRef = useRef<Set<number>>(new Set());
+
+  // bakeriesとinterestedの最新値をrefに同期
+  useEffect(() => { bakeriesRef.current = bakeries; }, [bakeries]);
+  useEffect(() => { interestedRef.current = interested; }, [interested]);
+
   useEffect(() => {
     if (!navigator.geolocation) { setLocating(false); return; }
+
+    // 初回取得
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
@@ -106,12 +118,42 @@ export default function Home() {
         setHasLocation(true);
         setLocating(false);
         currentPosRef.current = coords;
-        // 現在地に近い順にリージョンを並び替え
         setSortedRegions(sortRegionsByLocation(coords[0], coords[1]));
       },
       () => setLocating(false),
       { timeout: 10000, maximumAge: 60000 }
     );
+
+    // 継続監視(30秒ごとに位置更新)
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setCenter(coords);
+        currentPosRef.current = coords;
+
+        // 気になる店の近接チェック
+        const now = Date.now();
+        const ALERT_RADIUS_KM = 0.5; // 500m
+        const COOLDOWN_MS = 60 * 60 * 1000; // 1時間
+
+        for (const bakery of bakeriesRef.current) {
+          if (!interestedRef.current.has(bakery.id)) continue;
+          const dist = calcDistance(coords[0], coords[1], bakery.latitude, bakery.longitude);
+          if (dist <= ALERT_RADIUS_KM) {
+            const lastNotified = notifiedRef.current.get(bakery.id) || 0;
+            if (now - lastNotified > COOLDOWN_MS) {
+              notifiedRef.current.set(bakery.id, now);
+              setNearbyAlert({ ...bakery, distance: dist });
+              break; // 一度に1件だけ通知
+            }
+          }
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   useEffect(() => {
@@ -316,6 +358,31 @@ export default function Home() {
           {loading ? "読込中..." : `${bakeries.length}件`}
         </p>
       </header>
+
+      {/* 近接アラートバナー */}
+      {nearbyAlert && (
+        <div
+          className="bg-red-500 text-white px-4 py-3 flex items-center justify-between cursor-pointer shadow-lg"
+          onClick={() => {
+            setNearbyAlert(null);
+            setView("map");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const map = (window as any)._gopanMap;
+            if (map) map.setView([nearbyAlert.latitude, nearbyAlert.longitude], 16);
+          }}
+        >
+          <div className="flex-1">
+            <p className="font-bold text-sm">🥐 近くに気になるお店があります!</p>
+            <p className="text-xs mt-0.5 text-red-100">
+              {nearbyAlert.name} — {nearbyAlert.distance != null ? formatDistance(nearbyAlert.distance) : ""}
+            </p>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setNearbyAlert(null); }}
+            className="text-red-200 text-lg ml-3"
+          >✕</button>
+        </div>
+      )}
 
       <div className="flex bg-white border-b border-amber-100">
         <button onClick={() => setView("map")}
