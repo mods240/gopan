@@ -49,15 +49,36 @@ const currentIcon = L.divIcon({
   className: "",
 });
 
-const createClusterIcon = (cluster: { getChildCount: () => number }) => {
+// クラスター内のマーカーを検査して色を決定
+function getClusterColor(cluster: { getChildCount: () => number; getAllChildMarkers: () => L.Marker[] }, interested: Set<number>, bookmarks: Set<number>): string {
+  const markers = cluster.getAllChildMarkers();
+  let hasInterested = false;
+  let hasBookmark = false;
+  for (const marker of markers) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const id = (marker.options as any).bakeryId as number;
+    if (id && interested.has(id)) { hasInterested = true; break; }
+    if (id && bookmarks.has(id)) hasBookmark = true;
+  }
+  if (hasInterested) return "#ef4444"; // 赤
+  if (hasBookmark) return "#f59e0b";   // 黄
+  return "#92400e";                     // 茶(通常)
+}
+
+const createClusterIcon = (
+  cluster: { getChildCount: () => number; getAllChildMarkers: () => L.Marker[] },
+  interested: Set<number>,
+  bookmarks: Set<number>
+) => {
   const count = cluster.getChildCount();
+  const color = getClusterColor(cluster, interested, bookmarks);
   return L.divIcon({
     html: `<div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center">
       <span style="font-size:34px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3))">🥐</span>
       <div style="
         position:absolute;top:0;right:0;
         min-width:18px;height:18px;
-        background:#92400e;color:white;
+        background:${color};color:white;
         border:2px solid white;
         border-radius:9px;
         font-size:10px;font-weight:bold;
@@ -159,7 +180,7 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
 
         <MarkerClusterGroup
           chunkedLoading
-          iconCreateFunction={createClusterIcon}
+          iconCreateFunction={(cluster) => createClusterIcon(cluster as Parameters<typeof createClusterIcon>[0], interested, bookmarks)}
           maxClusterRadius={60}
           showCoverageOnHover={false}
           zoomToBoundsOnClick={true}
@@ -176,8 +197,14 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
                 key={bakery.id}
                 position={[bakery.latitude, bakery.longitude]}
                 icon={icon}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                {...{ bakeryId: bakery.id } as any}
                 ref={(ref) => {
-                  if (ref) markerRefs.current[bakery.id] = ref;
+                  if (ref) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (ref.options as any).bakeryId = bakery.id;
+                    markerRefs.current[bakery.id] = ref;
+                  }
                 }}
               >
                 <Popup>
