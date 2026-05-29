@@ -1,145 +1,354 @@
-export default function About() {
-  return (
-    <div className="min-h-screen bg-amber-50">
-      {/* ヘッダー */}
-      <header className="bg-amber-800 text-white px-4 py-4">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <a href="/" className="text-amber-300 text-sm">← 地図に戻る</a>
-          <h1 className="text-lg font-bold">🥐 ゴパンについて</h1>
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
+import { supabase } from "@/lib/supabase";
+
+const Map = dynamic(() => import("@/components/Map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full bg-amber-50">
+      <p className="text-amber-800">🥐 地図を読み込み中...</p>
+    </div>
+  ),
+});
+
+interface Bakery {
+  id: number;
+  name: string | null;
+  latitude: number;
+  longitude: number;
+  area: string | null;
+  address: string | null;
+  opening_hours: string | null;
+  website: string | null;
+  region: string | null;
+  distance?: number;
+}
+
+const ALL_REGIONS = [
+  { name: '関西', emoji: '🏯', desc: '大阪・京都・兵庫・奈良など' },
+  { name: '関東', emoji: '🗼', desc: '東京・神奈川・埼玉・千葉など' },
+  { name: '中京', emoji: '🏙️', desc: '愛知・岐阜・三重・静岡' },
+  { name: '東北', emoji: '⛄', desc: '宮城・福島・青森・岩手など' },
+  { name: '北陸・信越', emoji: '🦀', desc: '新潟・長野・富山・石川・福井' },
+  { name: '中国・四国', emoji: '🍋', desc: '広島・岡山・香川・愛媛など' },
+  { name: '九州', emoji: '🌋', desc: '福岡・熊本・鹿児島・長崎など' },
+  { name: '北海道', emoji: '🐻', desc: '北海道全域' },
+  { name: '沖縄', emoji: '🌺', desc: '沖縄全島' },
+];
+
+const STORAGE_KEY = 'gopan_selected_regions';
+const BOOKMARK_KEY = 'gopan_bookmarks';
+const INTERESTED_KEY = 'gopan_interested';
+const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
+
+type ViewType = "map" | "list" | "bookmarks";
+
+function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function formatDistance(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)}m`;
+  return `${km.toFixed(1)}km`;
+}
+
+export default function Home() {
+  const [bakeries, setBakeries] = useState<Bakery[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
+  const [interested, setInterested] = useState<Set<number>>(new Set());
+  const [showRegionSelect, setShowRegionSelect] = useState(false);
+  const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
+  const [hasLocation, setHasLocation] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(true);
+  const [view, setView] = useState<ViewType>("map");
+  const [initialized, setInitialized] = useState(false);
+  const currentPosRef = useRef<[number, number] | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setLocating(false); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setCenter(coords);
+        setHasLocation(true);
+        setLocating(false);
+        currentPosRef.current = coords;
+      },
+      () => setLocating(false),
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) { setSelectedRegions(JSON.parse(saved)); }
+    else { setShowRegionSelect(true); }
+    const savedBookmarks = localStorage.getItem(BOOKMARK_KEY);
+    if (savedBookmarks) { setBookmarks(new Set(JSON.parse(savedBookmarks))); }
+    const savedInterested = localStorage.getItem(INTERESTED_KEY);
+    if (savedInterested) { setInterested(new Set(JSON.parse(savedInterested))); }
+    setInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!initialized || selectedRegions.length === 0) return;
+    fetchBakeries(selectedRegions);
+  }, [selectedRegions, initialized]);
+
+  useEffect(() => {
+    if (!hasLocation || bakeries.length === 0) return;
+    const [lat, lng] = center;
+    setBakeries(prev => prev.map(b => ({
+      ...b,
+      distance: calcDistance(lat, lng, b.latitude, b.longitude)
+    })));
+  }, [hasLocation]);
+
+  async function fetchBakeries(regions: string[]) {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("bakeries")
+      .select("id, name, latitude, longitude, area, address, opening_hours, website, region")
+      .in("region", regions);
+    if (error) console.error("Supabase error:", error);
+    const raw = data || [];
+    const pos = currentPosRef.current;
+    if (pos) {
+      const [lat, lng] = pos;
+      setBakeries(raw.map(b => ({ ...b, distance: calcDistance(lat, lng, b.latitude, b.longitude) })));
+    } else {
+      setBakeries(raw);
+    }
+    setLoading(false);
+  }
+
+  const toggleBookmark = useCallback((id: number) => {
+    setBookmarks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      localStorage.setItem(BOOKMARK_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  const toggleInterested = useCallback((id: number) => {
+    setInterested(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      localStorage.setItem(INTERESTED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  function handleRegionToggle(region: string) {
+    setSelectedRegions(prev =>
+      prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
+    );
+  }
+
+  function handleRegionConfirm() {
+    if (selectedRegions.length === 0) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedRegions));
+    setShowRegionSelect(false);
+  }
+
+  const sortedBakeries = [...bakeries].sort((a, b) => {
+    if (a.distance != null && b.distance != null) return a.distance - b.distance;
+    if (a.distance != null) return -1;
+    if (b.distance != null) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const bookmarkedBakeries = sortedBakeries.filter(b => bookmarks.has(b.id));
+
+  if (showRegionSelect) {
+    return (
+      <div className="flex flex-col min-h-screen bg-amber-50">
+        <header className="bg-amber-800 text-white px-4 py-4 text-center">
+          <h1 className="text-2xl font-bold">🥐 ゴパン</h1>
+          <p className="text-sm text-amber-200 mt-1">使うエリアを選んでください</p>
+        </header>
+        <div className="flex-1 px-4 py-4">
+          <p className="text-xs text-gray-500 mb-4 text-center">複数選択できます。後から変更も可能です。</p>
+          <div className="grid grid-cols-1 gap-3">
+            {ALL_REGIONS.map(region => {
+              const isSelected = selectedRegions.includes(region.name);
+              return (
+                <button key={region.name} onClick={() => handleRegionToggle(region.name)}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    isSelected ? "bg-amber-700 border-amber-700 text-white" : "bg-white border-amber-200 text-amber-900"
+                  }`}
+                >
+                  <span className="text-2xl">{region.emoji}</span>
+                  <div>
+                    <p className="font-bold text-sm">{region.name}</p>
+                    <p className={`text-xs mt-0.5 ${isSelected ? "text-amber-200" : "text-gray-500"}`}>{region.desc}</p>
+                  </div>
+                  {isSelected && <span className="ml-auto text-white text-lg">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-400 text-center mt-6">
+            パン屋の位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用しています。情報が古い・不正確な場合があります。
+          </p>
+          <p className="text-xs text-center mt-2">
+            <a href="/about" className="text-amber-600 underline">
+              📋 プライバシーポリシー・免責事項・ご注意
+            </a>
+          </p>
         </div>
+        <div className="sticky bottom-0 p-4 bg-amber-50 border-t border-amber-200">
+          <button onClick={handleRegionConfirm} disabled={selectedRegions.length === 0}
+            className={`w-full py-4 rounded-xl font-bold text-lg transition-colors ${
+              selectedRegions.length > 0 ? "bg-amber-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            {selectedRegions.length > 0 ? `${selectedRegions.join('・')}で始める 🥐` : "エリアを選んでください"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const BakeryListItem = ({ bakery }: { bakery: Bakery }) => {
+    const isBookmarked = bookmarks.has(bakery.id);
+    const isInterested = interested.has(bakery.id);
+    return (
+      <li className={`px-4 py-3 ${isInterested ? "bg-red-50" : "bg-white"} hover:bg-amber-50`}>
+        <div className="flex justify-between items-start">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-900 text-sm truncate">
+              🥐 {bakery.name || "名称不明"}
+            </p>
+            {bakery.distance != null && (
+              <p className="text-xs text-amber-600 mt-0.5 font-medium">
+                📍 {formatDistance(bakery.distance)}
+              </p>
+            )}
+            {bakery.address && <p className="text-xs text-gray-500 mt-0.5 truncate">{bakery.address}</p>}
+            {bakery.opening_hours && <p className="text-xs text-gray-400 mt-0.5 truncate">🕐 {bakery.opening_hours}</p>}
+          </div>
+          <div className="flex items-center gap-2 ml-3 shrink-0">
+            {/* 気になる(赤丸) */}
+            <button
+              onClick={() => toggleInterested(bakery.id)}
+              style={{
+                width: "28px", height: "28px",
+                borderRadius: "50%",
+                border: `2px solid ${isInterested ? "#ef4444" : "#d1d5db"}`,
+                background: isInterested ? "#ef4444" : "white",
+                color: isInterested ? "white" : "#d1d5db",
+                fontSize: "14px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+              }}
+              title="気になる"
+            >
+              ♥
+            </button>
+            {/* お気に入り(星) */}
+            <button
+              onClick={() => toggleBookmark(bakery.id)}
+              className={`text-xl ${isBookmarked ? "text-amber-400" : "text-gray-300"}`}
+            >
+              {isBookmarked ? "⭐" : "☆"}
+            </button>
+          </div>
+        </div>
+      </li>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-amber-50">
+      <header className="bg-amber-800 text-white px-4 py-3 flex items-center justify-between shadow-md">
+        <button onClick={() => setShowRegionSelect(true)} className="text-left">
+          <h1 className="text-xl font-bold">🥐 ゴパン</h1>
+          <p className="text-xs text-amber-300">タップでエリア変更</p>
+        </button>
+        <p className="text-xs text-amber-200">
+          {loading ? "読込中..." : `${bakeries.length}件`}
+        </p>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+      <div className="flex bg-white border-b border-amber-100">
+        <button onClick={() => setView("map")}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${view === "map" ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"}`}
+        >🗺️ 地図</button>
+        <button onClick={() => setView("list")}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${view === "list" ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"}`}
+        >📋 リスト</button>
+        <button onClick={() => setView("bookmarks")}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${view === "bookmarks" ? "text-amber-800 border-b-2 border-amber-700" : "text-gray-400"}`}
+        >⭐ {bookmarks.size > 0 ? bookmarks.size : ""}</button>
+      </div>
 
-        {/* アプリについて */}
-        <section>
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            ゴパンとは
-          </h2>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            「ゴパン」は、全国のパン屋を地図で見つけるWebアプリです。現在地周辺のパン屋をすぐに発見でき、気になるお店をブックマークできます。
-          </p>
-          <p className="text-sm text-gray-700 leading-relaxed mt-2">
-            名前の由来は「ご飯＋パン＝ゴパン」。「朝ゴパン買って帰ろう」という日常の言葉から生まれました。
-          </p>
-        </section>
-
-        {/* ご注意 */}
-        <section>
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            ⚠️ ご注意
-          </h2>
-          <div className="bg-amber-100 rounded-lg p-4 space-y-3">
-            <div>
-              <p className="text-sm font-bold text-amber-900">⭐ お気に入り・♥ 気になるについて</p>
-              <p className="text-sm text-gray-700 mt-1">
-                お気に入りと気になるの登録は、<strong>この端末のブラウザにのみ保存</strong>されます。ブラウザのキャッシュやデータを削除した場合、登録内容が消える場合があります。あらかじめご了承ください。
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-amber-900">📍 位置情報について</p>
-              <p className="text-sm text-gray-700 mt-1">
-                現在地の取得はお使いのデバイスのGPS機能を使用します。位置情報の利用許可をブラウザから求められた場合、許可することで現在地周辺のパン屋を表示できます。
-              </p>
-            </div>
+      <div className="flex-1 overflow-hidden">
+        {loading || locating ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <p className="text-amber-800">🥐 読み込み中...</p>
           </div>
-        </section>
-
-        {/* 免責事項 */}
-        <section>
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            免責事項
-          </h2>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            本アプリのパン屋情報はOpenStreetMapのデータを使用しており、情報が古い・不正確・閉店済みな場合があります。掲載情報の正確性・完全性を保証するものではありません。
-          </p>
-          <p className="text-sm text-gray-700 leading-relaxed mt-2">
-            本アプリの利用により生じたいかなる損害についても、開発者は責任を負いかねます。
-          </p>
-        </section>
-
-        {/* プライバシーポリシー */}
-        <section>
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            プライバシーポリシー
-          </h2>
-          <div className="space-y-3 text-sm text-gray-700">
-            <div>
-              <p className="font-bold text-amber-900">収集する情報</p>
-              <p className="mt-1">本アプリは以下の情報を収集する場合があります：</p>
-              <ul className="mt-1 ml-4 space-y-1 list-disc">
-                <li>位置情報（現在地表示のため、端末上でのみ使用）</li>
-                <li>アクセスログ（Vercelのサーバーログ）</li>
-                <li>広告配信のためのCookie（Google AdSense使用時）</li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-bold text-amber-900">広告について</p>
-              <p className="mt-1">
-                本アプリではGoogle AdSenseを利用した広告を掲載する場合があります。Googleは広告配信にCookieを使用することがあります。詳細は
-                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline ml-1">
-                  Googleのプライバシーポリシー
-                </a>
-                をご確認ください。
-              </p>
-            </div>
-            <div>
-              <p className="font-bold text-amber-900">第三者サービス</p>
-              <ul className="mt-1 ml-4 space-y-1 list-disc">
-                <li>
-                  <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">OpenStreetMap</a>
-                  （地図データ・パン屋情報）
-                </li>
-                <li>
-                  <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">Supabase</a>
-                  （データベース）
-                </li>
-                <li>
-                  <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">Vercel</a>
-                  （ホスティング）
-                </li>
-              </ul>
-            </div>
+        ) : view === "map" ? (
+          <div className="h-full">
+            <Map
+              bakeries={bakeries}
+              center={center}
+              bookmarks={bookmarks}
+              interested={interested}
+              onToggleBookmark={toggleBookmark}
+              onToggleInterested={toggleInterested}
+            />
           </div>
-        </section>
-
-        {/* データの出典 */}
-        <section>
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            データの出典
-          </h2>
-          <p className="text-sm text-gray-700">
-            パン屋の位置情報は
-            <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline mx-1">
-              OpenStreetMap
-            </a>
-            のデータを使用しています（© OpenStreetMap contributors, ODbLライセンス）。
-          </p>
-        </section>
-
-        {/* お問い合わせ */}
-        <section>
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            お問い合わせ
-          </h2>
-          <p className="text-sm text-gray-700">
-            ご意見・ご要望・パン屋情報の誤りなどは、OpenStreetMapの編集機能からご報告いただくか、下記までご連絡ください。
-          </p>
-          <p className="text-sm text-amber-700 mt-2">
-            ※ お問い合わせフォームは準備中です。
-          </p>
-        </section>
-
-        {/* 開発者情報 */}
-        <section className="pb-8">
-          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
-            開発者
-          </h2>
-          <p className="text-sm text-gray-700">mods240</p>
-          <p className="text-xs text-gray-400 mt-4 text-center">
-            🥐 ゴパン v1.0 | © 2026 mods240
-          </p>
-        </section>
+        ) : view === "bookmarks" ? (
+          <div className="h-full overflow-y-auto">
+            {bookmarkedBakeries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2">
+                <p className="text-gray-500 text-sm">お気に入りはまだありません</p>
+                <p className="text-gray-400 text-xs">リストの ☆ から登録できます</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-amber-100">
+                {bookmarkedBakeries.map(bakery => <BakeryListItem key={bakery.id} bakery={bakery} />)}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <div className="h-full overflow-y-auto">
+            {sortedBakeries.length === 0 ? (
+              <div className="flex items-center justify-center h-40">
+                <p className="text-gray-500 text-sm">パン屋が見つかりません</p>
+              </div>
+            ) : (
+              <>
+                {hasLocation && (
+                  <p className="text-xs text-amber-700 text-center py-2 bg-amber-50 border-b border-amber-100">
+                    📍 現在地から近い順　♥気になる　☆お気に入り
+                  </p>
+                )}
+                <ul className="divide-y divide-amber-100">
+                  {sortedBakeries.map(bakery => <BakeryListItem key={bakery.id} bakery={bakery} />)}
+                </ul>
+                <p className="text-xs text-gray-400 text-center py-4 px-4">
+                  位置情報は <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> のデータを使用。情報が古い・不正確な場合があります。<br/>
+                  ⭐♥の登録はこの端末のブラウザに保存されます。キャッシュ削除で消える場合があります。<br/>
+                  <a href="/about" className="text-amber-600 underline mt-1 inline-block">
+                    📋 プライバシーポリシー・免責事項
+                  </a>
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
