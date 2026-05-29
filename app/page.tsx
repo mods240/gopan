@@ -309,7 +309,18 @@ export default function Home() {
       <li className={`px-4 py-3 ${isInterested ? "bg-red-50" : "bg-white"} hover:bg-amber-50`}>
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-amber-900 text-sm truncate">
+            <p
+              className="font-medium text-amber-900 text-sm truncate cursor-pointer underline decoration-amber-300"
+              onClick={() => {
+                setView("map");
+                setTimeout(() => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const map = (window as any)._gopanMap;
+                  if (map) map.setView([bakery.latitude, bakery.longitude], 17);
+                }, 100);
+              }}
+              title="地図で見る"
+            >
               🥐 {bakery.name || "名称不明"}
             </p>
             {bakery.distance != null && (
