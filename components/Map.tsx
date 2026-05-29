@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
@@ -27,7 +27,6 @@ const starIcon = L.divIcon({
   className: "",
 });
 
-// 選択中(赤ピン) - SVGで直接描画
 const selectedIcon = L.divIcon({
   html: `<div style="position:relative;width:30px;height:56px">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 50" width="30" height="50" style="position:absolute;top:6px;left:0">
@@ -42,14 +41,44 @@ const selectedIcon = L.divIcon({
   className: "",
 });
 
-const currentIcon = L.divIcon({
-  html: `<div style="width:20px;height:20px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(37,99,235,0.6)"></div>`,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-  className: "",
-});
+// 方向ビーム付き現在地アイコンを動的生成
+function createCurrentIcon(heading: number | null): L.DivIcon {
+  const beam = heading !== null ? `
+    <div style="
+      position:absolute;
+      width:0;height:0;
+      left:50%;top:50%;
+      transform-origin:0 0;
+      transform:rotate(${heading}deg) translateX(-50%);
+      border-left:18px solid transparent;
+      border-right:18px solid transparent;
+      border-bottom:52px solid rgba(37,99,235,0.2);
+      margin-left:-18px;margin-top:-52px;
+      filter:blur(2px);
+    "></div>
+    <div style="
+      position:absolute;
+      width:0;height:0;
+      left:50%;top:50%;
+      transform-origin:0 0;
+      transform:rotate(${heading}deg) translateX(-50%);
+      border-left:10px solid transparent;
+      border-right:10px solid transparent;
+      border-bottom:36px solid rgba(37,99,235,0.5);
+      margin-left:-10px;margin-top:-36px;
+    "></div>
+  ` : "";
+  return L.divIcon({
+    html: `<div style="position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
+      ${beam}
+      <div style="position:relative;z-index:2;width:20px;height:20px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(37,99,235,0.6)"></div>
+    </div>`,
+    iconSize: [60, 60],
+    iconAnchor: [30, 30],
+    className: "",
+  });
+}
 
-// クラスター内のマーカーを検査して色を決定
 function getClusterColor(cluster: { getChildCount: () => number; getAllChildMarkers: () => L.Marker[] }, interested: Set<number>, bookmarks: Set<number>): string {
   const markers = cluster.getAllChildMarkers();
   let hasInterested = false;
@@ -60,9 +89,9 @@ function getClusterColor(cluster: { getChildCount: () => number; getAllChildMark
     if (id && interested.has(id)) { hasInterested = true; break; }
     if (id && bookmarks.has(id)) hasBookmark = true;
   }
-  if (hasInterested) return "#ef4444"; // 赤
-  if (hasBookmark) return "#f59e0b";   // 黄
-  return "#92400e";                     // 茶(通常)
+  if (hasInterested) return "#ef4444";
+  if (hasBookmark) return "#f59e0b";
+  return "#92400e";
 }
 
 const createClusterIcon = (
@@ -151,6 +180,34 @@ function LocateButton({ center }: { center: [number, number] }) {
 
 export default function Map({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested, onShareBakery, pairId }: MapProps) {
   const markerRefs = useRef<Record<number, L.Marker>>({});
+  const [heading, setHeading] = useState<number | null>(null);
+
+  // デバイスの向きを取得してビームに反映
+  useEffect(() => {
+    function handleOrientation(e: DeviceOrientationEvent) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ios = (e as any).webkitCompassHeading;
+      if (ios != null) {
+        setHeading(ios);
+      } else if (e.alpha != null) {
+        setHeading(360 - e.alpha);
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const DevOrient = DeviceOrientationEvent as any;
+    if (typeof DevOrient.requestPermission === "function") {
+      DevOrient.requestPermission()
+        .then((result: string) => {
+          if (result === "granted") {
+            window.addEventListener("deviceorientation", handleOrientation, true);
+          }
+        })
+        .catch(() => {});
+    } else {
+      window.addEventListener("deviceorientation", handleOrientation, true);
+    }
+    return () => window.removeEventListener("deviceorientation", handleOrientation, true);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,8 +221,6 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
     if (el) { el.style.transform = ''; el.style.transition = ''; }
   }, []);
 
-
-
   return (
     <div style={{ position: "relative", height: "100%", width: "100%" }}>
       <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }}>
@@ -176,7 +231,7 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
         <MapInit center={center} />
         <LocateButton center={center} />
 
-        <Marker position={center} icon={currentIcon}>
+        <Marker position={center} icon={createCurrentIcon(heading)}>
           <Popup>📍 現在地</Popup>
         </Marker>
 
@@ -270,9 +325,7 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
                     </a>
                     <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
                       <a
-                        href={`https://line.me/R/share?text=${encodeURIComponent(`🥐 ${bakery.name}
-${bakery.address || ""}
-https://gopan.vercel.app`)}`}
+                        href={"https://line.me/R/share?text=" + encodeURIComponent("🥐 " + (bakery.name || "") + "\n" + (bakery.address || "") + "\nhttps://gopan.vercel.app")}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -284,10 +337,7 @@ https://gopan.vercel.app`)}`}
                         LINE
                       </a>
                       <a
-                        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🥐 ${bakery.name} に行ってきた！
-${bakery.address || ""}
-#ゴパン #パン活
-https://gopan.vercel.app`)}`}
+                        href={"https://twitter.com/intent/tweet?text=" + encodeURIComponent("🥐 " + (bakery.name || "") + " に行ってきた！\n" + (bakery.address || "") + "\n#ゴパン #パン活\nhttps://gopan.vercel.app")}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
