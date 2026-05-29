@@ -169,7 +169,7 @@ export default function Home() {
   // 店舗を送信
   const shareBakery = async (bakery: Bakery) => {
     if (!pairIdRef.current) { alert('ペアリングしてから送信してください'); return; }
-    await supabase.from('gopan_shared_bakeries').insert({
+    const { error } = await supabase.from('gopan_shared_bakeries').insert({
       pair_id: pairIdRef.current,
       bakery_id: bakery.id,
       bakery_name: bakery.name,
@@ -177,6 +177,11 @@ export default function Home() {
       longitude: bakery.longitude,
       address: bakery.address,
     });
+    if (error) {
+      console.error('送信エラー:', JSON.stringify(error));
+      alert('送信失敗: ' + error.message);
+      return;
+    }
     alert('📤 送信しました！');
   };
 
