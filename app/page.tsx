@@ -544,7 +544,7 @@ export default function Home() {
 
       {/* ペアリングモーダル */}
       {showPairModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <h2 className="text-lg font-bold text-amber-900 mb-1">🔗 ペアリング</h2>
             <p className="text-xs text-gray-500 mb-4">同乗者とパン屋を共有できます</p>
