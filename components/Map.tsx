@@ -27,15 +27,18 @@ const starIcon = L.divIcon({
   className: "",
 });
 
-// 選択中(赤ピン)
+// 選択中(赤ピン) - SVGで直接描画
 const selectedIcon = L.divIcon({
-  html: `<div style="position:relative">
-    <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" style="width:30px;height:49px;filter:hue-rotate(140deg) saturate(3) brightness(1.1)"/>
-    <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:bold;white-space:nowrap">ここ!</div>
+  html: `<div style="position:relative;width:30px;height:56px">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 50" width="30" height="50" style="position:absolute;top:6px;left:0">
+      <path d="M15 0 C6.7 0 0 6.7 0 15 C0 26 15 50 15 50 C15 50 30 26 30 15 C30 6.7 23.3 0 15 0Z" fill="#ef4444" stroke="white" stroke-width="2"/>
+      <circle cx="15" cy="15" r="6" fill="white" opacity="0.9"/>
+    </svg>
+    <div style="position:absolute;top:-2px;left:50%;transform:translateX(-50%);background:#ef4444;color:white;border-radius:8px;padding:1px 5px;font-size:9px;font-weight:bold;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.3)">気になる!</div>
   </div>`,
-  iconSize: [30, 49],
-  iconAnchor: [15, 49],
-  popupAnchor: [0, -49],
+  iconSize: [30, 56],
+  iconAnchor: [15, 56],
+  popupAnchor: [0, -56],
   className: "",
 });
 
