@@ -740,7 +740,7 @@ export default function Home() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="店舗名・住所で検索..."
-                  className="w-full pl-8 pr-8 py-2 text-sm border border-amber-200 rounded-full bg-amber-50 focus:outline-none focus:border-amber-500"
+                  className="w-full pl-8 pr-8 py-2 text-sm border border-amber-200 rounded-full bg-amber-50 focus:outline-none focus:border-amber-500 text-gray-800 placeholder-gray-400"
                 />
                 {searchQuery && (
                   <button
