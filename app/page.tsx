@@ -60,6 +60,7 @@ function sortRegionsByLocation(lat: number, lng: number) {
     return distA - distB;
   });
 }
+const STORAGE_KEY = 'gopan_selected_regions';
 const BOOKMARK_KEY = 'gopan_bookmarks';
 const INTERESTED_KEY = 'gopan_interested';
 const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
