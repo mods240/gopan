@@ -522,9 +522,7 @@ export default function Home() {
             )}
             {/* LINE共有 */}
             <a
-              href={"https://line.me/R/share?text=" + encodeURIComponent("🥐 " + (bakery.name || "") + "
-" + (bakery.address || "") + "
-https://gopan.vercel.app")}
+              href={"https://line.me/R/share?text=" + encodeURIComponent("🥐 " + (bakery.name || "") + "\n" + (bakery.address || "") + "\nhttps://gopan.vercel.app")}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -543,10 +541,7 @@ https://gopan.vercel.app")}
             </a>
             {/* X投稿 */}
             <a
-              href={"https://twitter.com/intent/tweet?text=" + encodeURIComponent("🥐 " + (bakery.name || "") + " に行ってきた！
-" + (bakery.address || "") + "
-#ゴパン #パン活
-https://gopan.vercel.app")}
+              href={"https://twitter.com/intent/tweet?text=" + encodeURIComponent("🥐 " + (bakery.name || "") + " に行ってきた！\n" + (bakery.address || "") + "\n#ゴパン #パン活\nhttps://gopan.vercel.app")}
               target="_blank"
               rel="noopener noreferrer"
               style={{
