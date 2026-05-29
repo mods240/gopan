@@ -109,7 +109,7 @@ export default function Home() {
 
   // ペアルーム作成
   const createPair = async () => {
-    const newId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newId = Math.random().toString(36).substring(2, 8).toLowerCase();
     const { error } = await supabase.from('gopan_pairs').insert({ id: newId });
     if (error) { alert('ルーム作成に失敗しました: ' + error.message); return; }
     setPairId(newId);
@@ -120,7 +120,7 @@ export default function Home() {
 
   // ペアルーム参加
   const joinPair = async (id: string) => {
-    const trimmed = id.trim().toUpperCase();
+    const trimmed = id.trim().toLowerCase();
     const { data, error } = await supabase.from('gopan_pairs').select('id').eq('id', trimmed).maybeSingle();
     console.log('joinPair', trimmed, data, error);
     if (!data) { alert('ルームが見つかりません。コードを確認してください。'); return; }
@@ -610,7 +610,7 @@ export default function Home() {
                 <input
                   type="text"
                   value={pairInput}
-                  onChange={e => setPairInput(e.target.value.toUpperCase())}
+                  onChange={e => setPairInput(e.target.value.toLowerCase())}
                   placeholder="コードを入力(例: AB1234)"
                   className="w-full px-4 py-2 border border-amber-200 rounded-xl text-sm mb-2 focus:outline-none focus:border-amber-500 text-center tracking-widest font-bold"
                   maxLength={6}
