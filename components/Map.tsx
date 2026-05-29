@@ -113,6 +113,8 @@ interface MapProps {
   interested: Set<number>;
   onToggleBookmark: (id: number) => void;
   onToggleInterested: (id: number) => void;
+  onShareBakery?: (bakery: Bakery) => void;
+  pairId?: string | null;
 }
 
 function MapInit({ center }: { center: [number, number] }) {
@@ -147,7 +149,7 @@ function LocateButton({ center }: { center: [number, number] }) {
   );
 }
 
-export default function Map({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested }: MapProps) {
+export default function Map({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested, onShareBakery, pairId }: MapProps) {
   const markerRefs = useRef<Record<number, L.Marker>>({});
 
   useEffect(() => {
@@ -244,6 +246,20 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
                         {isBookmarked ? "⭐ お気に入り" : "☆ お気に入り"}
                       </button>
                     </div>
+                    {pairId && onShareBakery && (
+                      <button
+                        onClick={() => onShareBakery(bakery)}
+                        style={{
+                          width: "100%", padding: "4px",
+                          background: "#fef3c7",
+                          border: "1px solid #f59e0b",
+                          borderRadius: "4px", cursor: "pointer", fontSize: "12px",
+                          color: "#92400e", marginTop: "6px", fontWeight: "bold",
+                        }}
+                      >
+                        📤 ペアに送る
+                      </button>
+                    )}
                     <a
                       href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
                       target="_blank"
