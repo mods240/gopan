@@ -138,7 +138,6 @@ export default function Home() {
 
   // Realtime購読
   const subscribePair = (id: string) => {
-    supabase.removeAllChannels();
     const channel = supabase
       .channel('pair-' + id)
       .on('postgres_changes', {
