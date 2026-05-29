@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase";
 
@@ -44,7 +44,6 @@ const DEFAULT_CENTER: [number, number] = [34.7, 135.5];
 
 type ViewType = "map" | "list" | "bookmarks";
 
-// 2点間の距離計算(km)
 function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -70,15 +69,19 @@ export default function Home() {
   const [locating, setLocating] = useState(true);
   const [view, setView] = useState<ViewType>("map");
   const [initialized, setInitialized] = useState(false);
+  const [selectedBakery, setSelectedBakery] = useState<Bakery | null>(null);
+  const currentPosRef = useRef<[number, number] | null>(null);
 
   // 現在地取得
   useEffect(() => {
     if (!navigator.geolocation) { setLocating(false); return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCenter([pos.coords.latitude, pos.coords.longitude]);
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setCenter(coords);
         setHasLocation(true);
         setLocating(false);
+        currentPosRef.current = coords;
       },
       () => setLocating(false),
       { timeout: 10000, maximumAge: 60000 }
@@ -100,16 +103,15 @@ export default function Home() {
     fetchBakeries(selectedRegions);
   }, [selectedRegions, initialized]);
 
-  // 現在地が取得できたら距離を再計算
+  // 現在地が取れたら距離を再計算
   useEffect(() => {
     if (!hasLocation || bakeries.length === 0) return;
     const [lat, lng] = center;
-    const withDistance = bakeries.map(b => ({
+    setBakeries(prev => prev.map(b => ({
       ...b,
       distance: calcDistance(lat, lng, b.latitude, b.longitude)
-    }));
-    setBakeries(withDistance);
-  }, [hasLocation, center]);
+    })));
+  }, [hasLocation]);
 
   async function fetchBakeries(regions: string[]) {
     setLoading(true);
@@ -119,9 +121,10 @@ export default function Home() {
       .in("region", regions);
     if (error) console.error("Supabase error:", error);
     const raw = data || [];
-    // 現在地があれば距離計算
-    if (hasLocation) {
-      const [lat, lng] = center;
+    // 現在地が既に取れていれば距離計算
+    const pos = currentPosRef.current;
+    if (pos) {
+      const [lat, lng] = pos;
       setBakeries(raw.map(b => ({
         ...b,
         distance: calcDistance(lat, lng, b.latitude, b.longitude)
@@ -141,6 +144,18 @@ export default function Home() {
     });
   }, []);
 
+  // リストから地図にジャンプ
+  function handleSelectBakery(bakery: Bakery) {
+    setSelectedBakery(bakery);
+    setView("map");
+    // 地図をそのパン屋にフォーカス
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const map = (window as any)._gopanMap;
+    if (map) {
+      map.setView([bakery.latitude, bakery.longitude], 16);
+    }
+  }
+
   function handleRegionToggle(region: string) {
     setSelectedRegions(prev =>
       prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
@@ -153,7 +168,6 @@ export default function Home() {
     setShowRegionSelect(false);
   }
 
-  // 距離順ソート済みリスト
   const sortedBakeries = [...bakeries].sort((a, b) => {
     if (a.distance != null && b.distance != null) return a.distance - b.distance;
     if (a.distance != null) return -1;
@@ -163,7 +177,6 @@ export default function Home() {
 
   const bookmarkedBakeries = sortedBakeries.filter(b => bookmarks.has(b.id));
 
-  // エリア選択画面
   if (showRegionSelect) {
     return (
       <div className="flex flex-col min-h-screen bg-amber-50">
@@ -211,32 +224,33 @@ export default function Home() {
 
   const BakeryListItem = ({ bakery }: { bakery: Bakery }) => {
     const isBookmarked = bookmarks.has(bakery.id);
+    const isSelected = selectedBakery?.id === bakery.id;
     return (
-      <li className="px-4 py-3 bg-white hover:bg-amber-50">
+      <li
+        className={`px-4 py-3 ${isSelected ? "bg-red-50 border-l-4 border-red-400" : "bg-white hover:bg-amber-50"}`}
+      >
         <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <p className="font-medium text-amber-900 text-sm">🥐 {bakery.name || "名称不明"}</p>
+          <button
+            className="flex-1 text-left"
+            onClick={() => handleSelectBakery(bakery)}
+          >
+            <p className="font-medium text-amber-900 text-sm">
+              {isSelected ? "📍" : "🥐"} {bakery.name || "名称不明"}
+            </p>
             {bakery.distance != null && (
               <p className="text-xs text-amber-600 mt-0.5 font-medium">
-                📍 {formatDistance(bakery.distance)}
+                {formatDistance(bakery.distance)}
               </p>
             )}
             {bakery.address && <p className="text-xs text-gray-500 mt-0.5">{bakery.address}</p>}
             {bakery.opening_hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {bakery.opening_hours}</p>}
-          </div>
-          <div className="flex items-center gap-2 ml-3">
+          </button>
+          <div className="flex items-center gap-2 ml-3 shrink-0">
             <button onClick={() => toggleBookmark(bakery.id)}
               className={`text-xl ${isBookmarked ? "text-amber-400" : "text-gray-300"}`}
             >
               {isBookmarked ? "⭐" : "☆"}
             </button>
-            <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${bakery.latitude},${bakery.longitude}`}
-              target="_blank" rel="noopener noreferrer"
-              className="bg-amber-600 text-white text-xs py-1 px-3 rounded-full whitespace-nowrap"
-            >
-              地図
-            </a>
           </div>
         </div>
       </li>
@@ -274,14 +288,21 @@ export default function Home() {
           </div>
         ) : view === "map" ? (
           <div className="h-full">
-            <Map bakeries={bakeries} center={center} bookmarks={bookmarks} onToggleBookmark={toggleBookmark} />
+            <Map
+              bakeries={bakeries}
+              center={center}
+              bookmarks={bookmarks}
+              onToggleBookmark={toggleBookmark}
+              selectedBakery={selectedBakery}
+              onSelectBakery={setSelectedBakery}
+            />
           </div>
         ) : view === "bookmarks" ? (
           <div className="h-full overflow-y-auto">
             {bookmarkedBakeries.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2">
                 <p className="text-gray-500 text-sm">お気に入りはまだありません</p>
-                <p className="text-gray-400 text-xs">地図またはリストの ☆ から登録できます</p>
+                <p className="text-gray-400 text-xs">リストの ☆ から登録できます</p>
               </div>
             ) : (
               <ul className="divide-y divide-amber-100">
@@ -299,7 +320,7 @@ export default function Home() {
               <>
                 {hasLocation && (
                   <p className="text-xs text-amber-700 text-center py-2 bg-amber-50 border-b border-amber-100">
-                    📍 現在地から近い順
+                    📍 現在地から近い順　タップで地図に表示
                   </p>
                 )}
                 <ul className="divide-y divide-amber-100">
