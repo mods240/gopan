@@ -194,11 +194,8 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
 
   function startCompass() {
     function handleOrientation(e: DeviceOrientationEvent) {
-      // iOSもAndroidも alpha を使って統一
-      // alpha: 0=北, 90=東, 180=南, 270=西 (反時計回り)
-      // SVGのrotateは時計回りなので 360-alpha に変換
       if (e.alpha != null) {
-        setHeading(360 - e.alpha);
+        setHeading(e.alpha);
       }
     }
     handleOrientationRef.current = handleOrientation;
