@@ -43,38 +43,34 @@ const selectedIcon = L.divIcon({
 
 // 方向ビーム付き現在地アイコンを動的生成
 function createCurrentIcon(heading: number | null): L.DivIcon {
-  const beam = heading !== null ? `
-    <div style="
-      position:absolute;
-      left:50%;
-      top:50%;
-      width:0;
-      height:0;
-      transform-origin:center top;
-      transform:translateX(-50%) rotate(${heading}deg);
-      border-left:14px solid transparent;
-      border-right:14px solid transparent;
-      border-bottom:48px solid rgba(37,99,235,0.35);
-      margin-top:-48px;
-    "></div>
-  ` : "";
+  // SVGで青丸＋ビームを一体で描画するのでずれない
+  const size = 80;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 10; // 青丸の半径
+
+  let beamSvg = "";
+  if (heading !== null) {
+    // ビームの三角形: 青丸の中心(cx,cy)を頂点として上方向に伸びる
+    // headingの角度に回転
+    beamSvg = `
+      <polygon
+        points="${cx},${cy} ${cx - 12},${cy - 44} ${cx + 12},${cy - 44}"
+        fill="rgba(37,99,235,0.35)"
+        transform="rotate(${heading}, ${cx}, ${cy})"
+      />
+    `;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+    ${beamSvg}
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#2563eb" stroke="white" stroke-width="3"/>
+  </svg>`;
+
   return L.divIcon({
-    html: `<div style="position:relative;width:80px;height:80px;">
-      ${beam}
-      <div style="
-        position:absolute;
-        left:50%;top:50%;
-        transform:translate(-50%,-50%);
-        z-index:2;
-        width:20px;height:20px;
-        background:#2563eb;
-        border:3px solid white;
-        border-radius:50%;
-        box-shadow:0 2px 8px rgba(37,99,235,0.6);
-      "></div>
-    </div>`,
-    iconSize: [80, 80],
-    iconAnchor: [40, 40],
+    html: svg,
+    iconSize: [size, size],
+    iconAnchor: [cx, cy],
     className: "",
   });
 }
