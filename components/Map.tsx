@@ -46,35 +46,35 @@ function createCurrentIcon(heading: number | null): L.DivIcon {
   const beam = heading !== null ? `
     <div style="
       position:absolute;
-      width:0;height:0;
-      left:50%;top:50%;
-      transform-origin:0 0;
-      transform:rotate(${heading}deg) translateX(-50%);
-      border-left:18px solid transparent;
-      border-right:18px solid transparent;
-      border-bottom:52px solid rgba(37,99,235,0.2);
-      margin-left:-18px;margin-top:-52px;
-      filter:blur(2px);
-    "></div>
-    <div style="
-      position:absolute;
-      width:0;height:0;
-      left:50%;top:50%;
-      transform-origin:0 0;
-      transform:rotate(${heading}deg) translateX(-50%);
-      border-left:10px solid transparent;
-      border-right:10px solid transparent;
-      border-bottom:36px solid rgba(37,99,235,0.5);
-      margin-left:-10px;margin-top:-36px;
+      left:50%;
+      top:50%;
+      width:0;
+      height:0;
+      transform-origin:center top;
+      transform:translateX(-50%) rotate(${heading}deg);
+      border-left:14px solid transparent;
+      border-right:14px solid transparent;
+      border-bottom:48px solid rgba(37,99,235,0.35);
+      margin-top:-48px;
     "></div>
   ` : "";
   return L.divIcon({
-    html: `<div style="position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
+    html: `<div style="position:relative;width:80px;height:80px;">
       ${beam}
-      <div style="position:relative;z-index:2;width:20px;height:20px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(37,99,235,0.6)"></div>
+      <div style="
+        position:absolute;
+        left:50%;top:50%;
+        transform:translate(-50%,-50%);
+        z-index:2;
+        width:20px;height:20px;
+        background:#2563eb;
+        border:3px solid white;
+        border-radius:50%;
+        box-shadow:0 2px 8px rgba(37,99,235,0.6);
+      "></div>
     </div>`,
-    iconSize: [60, 60],
-    iconAnchor: [30, 30],
+    iconSize: [80, 80],
+    iconAnchor: [40, 40],
     className: "",
   });
 }
@@ -160,10 +160,21 @@ function MapInit({ center }: { center: [number, number] }) {
   return null;
 }
 
-function LocateButton({ center }: { center: [number, number] }) {
+function LocateButton({ center, onRequestCompass }: { center: [number, number]; onRequestCompass: () => void }) {
   const map = useMap();
   return (
-    <div style={{ position: "absolute", bottom: "24px", right: "12px", zIndex: 1000 }}>
+    <div style={{ position: "absolute", bottom: "24px", right: "12px", zIndex: 1000, display: "flex", flexDirection: "column", gap: "8px" }}>
+      <button
+        onClick={onRequestCompass}
+        title="方向を表示"
+        style={{
+          width: "44px", height: "44px", borderRadius: "50%",
+          background: "white", border: "2px solid #2563eb",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          fontSize: "20px", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >🧭</button>
       <button
         onClick={() => map.setView(center, 14)}
         style={{
@@ -183,7 +194,9 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
   const [heading, setHeading] = useState<number | null>(null);
 
   // デバイスの向きを取得してビームに反映
-  useEffect(() => {
+  const handleOrientationRef = useRef<((e: DeviceOrientationEvent) => void) | null>(null);
+
+  function startCompass() {
     function handleOrientation(e: DeviceOrientationEvent) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ios = (e as any).webkitCompassHeading;
@@ -193,20 +206,32 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
         setHeading(360 - e.alpha);
       }
     }
+    handleOrientationRef.current = handleOrientation;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const DevOrient = DeviceOrientationEvent as any;
     if (typeof DevOrient.requestPermission === "function") {
+      // iOS 13+: ユーザーのタップが必要
       DevOrient.requestPermission()
         .then((result: string) => {
           if (result === "granted") {
             window.addEventListener("deviceorientation", handleOrientation, true);
+          } else {
+            alert("コンパスの使用が許可されませんでした");
           }
         })
-        .catch(() => {});
+        .catch(() => alert("コンパスの許可に失敗しました"));
     } else {
+      // Android・PCは自動で有効
       window.addEventListener("deviceorientation", handleOrientation, true);
     }
-    return () => window.removeEventListener("deviceorientation", handleOrientation, true);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (handleOrientationRef.current) {
+        window.removeEventListener("deviceorientation", handleOrientationRef.current, true);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -229,7 +254,7 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapInit center={center} />
-        <LocateButton center={center} />
+        <LocateButton center={center} onRequestCompass={startCompass} />
 
         <Marker position={center} icon={createCurrentIcon(heading)}>
           <Popup>📍 現在地</Popup>
