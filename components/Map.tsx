@@ -225,11 +225,14 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
   }
 
   useEffect(() => {
+    // マウント時に自動でコンパス開始
+    startCompass();
     return () => {
       if (handleOrientationRef.current) {
         window.removeEventListener("deviceorientation", handleOrientationRef.current, true);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
