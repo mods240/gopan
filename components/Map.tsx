@@ -194,8 +194,14 @@ export default function Map({ bakeries, center, bookmarks, interested, onToggleB
 
   function startCompass() {
     function handleOrientation(e: DeviceOrientationEvent) {
-      if (e.alpha != null) {
-        setHeading(e.alpha);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ios = (e as any).webkitCompassHeading;
+      if (ios != null) {
+        // iOS: webkitCompassHeadingは真北基準・時計回り
+        setHeading(ios);
+      } else if (e.alpha != null) {
+        // Android: alphaは反時計回りなので変換
+        setHeading(360 - e.alpha);
       }
     }
     handleOrientationRef.current = handleOrientation;
