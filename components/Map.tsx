@@ -5,13 +5,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import MarkerClusterGroup from "react-leaflet-cluster";
 
-interface Restaurant {
+interface Bakery {
   id: number;
   name: string | null;
   latitude: number;
   longitude: number;
+  area: string | null;
   address: string | null;
-  cuisine: string | null;
   opening_hours: string | null;
   website: string | null;
   region: string | null;
@@ -80,7 +80,7 @@ function cuisineLabel(cuisine: string | null): string {
 }
 
 interface MapProps {
-  restaurants: Restaurant[];
+  bakeries: Bakery[];
   center: [number, number];
   bookmarks: Set<number>;
   interested: Set<number>;
@@ -102,7 +102,7 @@ function MapInit({ center }: { center: [number, number] }) {
   return null;
 }
 
-export default function FishtimeMap({ restaurants, center, bookmarks, interested, onToggleBookmark, onToggleInterested }: MapProps) {
+export default function FishtimeMap({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested }: MapProps) {
   const [heading, setHeading] = useState<number | null>(null);
   const handleOrientationRef = useRef<((e: DeviceOrientationEvent) => void) | null>(null);
 
@@ -183,7 +183,7 @@ export default function FishtimeMap({ restaurants, center, bookmarks, interested
           });
         }}
       >
-        {restaurants.map(restaurant => {
+        {bakeries.map(restaurant => {
           const isInterested = interested.has(restaurant.id);
           const isBookmarked = bookmarks.has(restaurant.id);
           const icon = isInterested ? interestedIcon : isBookmarked ? bookmarkIcon : defaultIcon;
