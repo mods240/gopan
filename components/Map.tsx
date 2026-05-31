@@ -106,14 +106,19 @@ export default function FishtimeMap({ restaurants, center, bookmarks, interested
   const [heading, setHeading] = useState<number | null>(null);
   const handleOrientationRef = useRef<((e: DeviceOrientationEvent) => void) | null>(null);
 
+  const headingRef = useRef<number | null>(null);
+
   function startCompass() {
     function handleOrientation(e: DeviceOrientationEvent) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ios = (e as any).webkitCompassHeading;
-      if (ios != null) {
-        setHeading(ios);
-      } else if (e.alpha != null) {
-        setHeading(360 - e.alpha);
+      const newHeading = ios != null ? ios : e.alpha != null ? 360 - e.alpha : null;
+      if (newHeading === null) return;
+      // 5度以上変化した時だけ更新（パカパカ防止）
+      const prev = headingRef.current;
+      if (prev === null || Math.abs(newHeading - prev) >= 5) {
+        headingRef.current = newHeading;
+        setHeading(newHeading);
       }
     }
     handleOrientationRef.current = handleOrientation;
