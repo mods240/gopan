@@ -86,6 +86,8 @@ interface MapProps {
   interested: Set<number>;
   onToggleBookmark: (id: number) => void;
   onToggleInterested: (id: number) => void;
+  onShareBakery?: (bakery: Bakery) => void;
+  pairId?: string | null;
 }
 
 function MapInit({ center }: { center: [number, number] }) {
@@ -102,7 +104,7 @@ function MapInit({ center }: { center: [number, number] }) {
   return null;
 }
 
-export default function FishtimeMap({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested }: MapProps) {
+export default function FishtimeMap({ bakeries, center, bookmarks, interested, onToggleBookmark, onToggleInterested, onShareBakery, pairId }: MapProps) {
   const [heading, setHeading] = useState<number | null>(null);
   const handleOrientationRef = useRef<((e: DeviceOrientationEvent) => void) | null>(null);
 
