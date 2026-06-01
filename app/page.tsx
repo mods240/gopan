@@ -88,13 +88,12 @@ function InstallBanner() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+    if (!isMobile) return; // PCでは表示しない
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
     setIsIOS(ios);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     if (isStandalone) return;
-    const closed = localStorage.getItem('gopan_banner_closed');
-    if (closed && Date.now() - parseInt(closed) < 86400000) return;
-
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -114,12 +113,13 @@ function InstallBanner() {
       deferredPrompt.userChoice.then(() => { setDeferredPrompt(null); setShow(false); });
     } else if (isIOS) {
       alert('① SafariでこのページのURLを開く\n② 下部の共有ボタン（四角に矢印）をタップ\n③「ホーム画面に追加」を選ぶ\n\n※ Chrome・Firefoxでは追加できません');
+    } else {
+      alert('Chromeのメニュー（右上の ⋮）をタップして\n「アプリをインストール」または\n「ホーム画面に追加」を選んでください');
     }
   }
 
   function handleClose() {
     setShow(false);
-    localStorage.setItem('gopan_banner_closed', String(Date.now()));
   }
 
   if (!show) return null;
