@@ -81,6 +81,65 @@ function formatDistance(km: number): string {
   return `${km.toFixed(1)}km`;
 }
 
+
+function InstallBanner() {
+  const [show, setShow] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    setIsIOS(ios);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (isStandalone) return;
+    const closed = localStorage.getItem('gopan_banner_closed');
+    if (closed && Date.now() - parseInt(closed) < 86400000) return;
+
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setTimeout(() => setShow(true), 2000);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setShow(false));
+
+    if (ios) setTimeout(() => setShow(true), 2000);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  function handleInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => { setDeferredPrompt(null); setShow(false); });
+    } else if (isIOS) {
+      alert('① SafariでこのページのURLを開く\n② 下部の共有ボタン（四角に矢印）をタップ\n③「ホーム画面に追加」を選ぶ\n\n※ Chrome・Firefoxでは追加できません');
+    }
+  }
+
+  function handleClose() {
+    setShow(false);
+    localStorage.setItem('gopan_banner_closed', String(Date.now()));
+  }
+
+  if (!show) return null;
+  return (
+    <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#fff', borderTop:'2px solid #92400e', padding:'12px 16px 28px', display:'flex', alignItems:'center', gap:12, zIndex:200, boxShadow:'0 -4px 20px rgba(146,64,14,0.15)' }}>
+      <span style={{ fontSize:'1.8rem', flexShrink:0 }}>📲</span>
+      <div style={{ flex:1 }}>
+        <p style={{ margin:'0 0 2px', fontWeight:800, fontSize:14, color:'#92400e' }}>ホーム画面に追加する</p>
+        <p style={{ margin:0, fontSize:11, color:'#b45309' }}>
+          {isIOS ? 'Safariで開く → 共有 → ホーム画面に追加' : 'アプリとしてインストール'}
+        </p>
+      </div>
+      <button onClick={handleInstall} style={{ background:'linear-gradient(90deg,#92400e,#78350f)', color:'#fff', border:'none', borderRadius:10, padding:'8px 14px', fontWeight:800, fontSize:13, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }}>
+        {isIOS ? '方法を見る' : '追加'}
+      </button>
+      <button onClick={handleClose} style={{ background:'none', border:'none', color:'#bbb', fontSize:'1rem', cursor:'pointer', padding:4, flexShrink:0 }}>✕</button>
+    </div>
+  );
+}
+
 export default function Home() {
   const [bakeries, setBakeries] = useState<Bakery[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
@@ -794,6 +853,7 @@ export default function Home() {
           </div>
         )}
       </div>
+      <InstallBanner />
     </div>
   );
 }
