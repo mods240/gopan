@@ -31,7 +31,6 @@ export default function About() {
           </h2>
           <div className="space-y-4">
 
-            {/* 基本 */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100">
               <p className="font-bold text-amber-900 text-sm mb-2">🗺️ 地図でパン屋を探す</p>
               <p className="text-sm text-gray-700 leading-relaxed">
@@ -39,7 +38,6 @@ export default function About() {
               </p>
             </div>
 
-            {/* リスト */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100">
               <p className="font-bold text-amber-900 text-sm mb-2">📋 リストで探す・検索する</p>
               <p className="text-sm text-gray-700 leading-relaxed">
@@ -47,7 +45,6 @@ export default function About() {
               </p>
             </div>
 
-            {/* 気になる・お気に入り */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100">
               <p className="font-bold text-amber-900 text-sm mb-2">♥ 気になる　⭐ お気に入り</p>
               <p className="text-sm text-gray-700 leading-relaxed">
@@ -55,7 +52,6 @@ export default function About() {
               </p>
             </div>
 
-            {/* 近接アラート */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100">
               <p className="font-bold text-amber-900 text-sm mb-2">🔔 近接アラート</p>
               <p className="text-sm text-gray-700 leading-relaxed">
@@ -63,7 +59,6 @@ export default function About() {
               </p>
             </div>
 
-            {/* ペアリング */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100 border-l-4 border-l-amber-500">
               <p className="font-bold text-amber-900 text-sm mb-2">🔗 ペアリング機能(同乗者と共有)</p>
               <p className="text-sm text-gray-700 leading-relaxed mb-3">
@@ -84,7 +79,6 @@ export default function About() {
               </p>
             </div>
 
-            {/* LINE・X共有 */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100">
               <p className="font-bold text-amber-900 text-sm mb-2">📤 LINE・Xで共有</p>
               <p className="text-sm text-gray-700 leading-relaxed">
@@ -92,7 +86,6 @@ export default function About() {
               </p>
             </div>
 
-            {/* PWA */}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-amber-100">
               <p className="font-bold text-amber-900 text-sm mb-2">📱 ホーム画面に追加(PWA)</p>
               <p className="text-sm text-gray-700 leading-relaxed">
@@ -172,18 +165,9 @@ export default function About() {
             <div>
               <p className="font-bold text-amber-900">第三者サービス</p>
               <ul className="mt-1 ml-4 space-y-1 list-disc">
-                <li>
-                  <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">OpenStreetMap</a>
-                  （地図データ・パン屋情報）
-                </li>
-                <li>
-                  <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">Supabase</a>
-                  （データベース・ペアリング機能）
-                </li>
-                <li>
-                  <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">Vercel</a>
-                  （ホスティング）
-                </li>
+                <li><a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">OpenStreetMap</a>（地図データ・パン屋情報）</li>
+                <li><a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">Supabase</a>（データベース・ペアリング機能）</li>
+                <li><a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">Vercel</a>（ホスティング）</li>
               </ul>
             </div>
           </div>
@@ -201,6 +185,47 @@ export default function About() {
             </a>
             のデータを使用しています（© OpenStreetMap contributors, ODbLライセンス）。
           </p>
+        </section>
+
+        {/* みんなで育てるマップ */}
+        <section>
+          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
+            🗺️ みんなで育てるマップ
+          </h2>
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <p className="text-sm text-gray-700 leading-relaxed mb-3">
+              近くのパン屋が載っていない場合、<a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">OpenStreetMap（OSM）</a>に追加していただくと次回のデータ更新時に反映されます。正確な情報をお持ちの方はぜひご協力ください！
+            </p>
+            <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer"
+              className="inline-block px-5 py-2 bg-amber-800 text-white text-sm font-bold rounded-full no-underline">
+              OSMで店舗を追加する →
+            </a>
+          </div>
+        </section>
+
+        {/* 関連アプリ */}
+        <section>
+          <h2 className="text-lg font-bold text-amber-900 border-b border-amber-200 pb-2 mb-3">
+            🔗 関連アプリ
+          </h2>
+          <div className="space-y-2">
+            {[
+              { name:'🐟 フィッシュタイム', desc:'近くの海鮮・寿司店を探す', url:'https://fishtime-eight.vercel.app' },
+              { name:'🍜 ラ・ラ・ラーメン', desc:'近くのラーメン店を探す', url:'https://lalaramen.vercel.app' },
+              { name:'🍢 アーリーバード', desc:'近くの焼き鳥店を探す', url:'https://earlybird-yakitori.vercel.app' },
+              { name:'🚻 トイレの駆け込み寺', desc:'近くの公衆トイレを探す', url:'https://toilet-kakekomi.vercel.app' },
+              { name:'🛍️ プチプラプラプラ', desc:'近くの100均・プチプラを探す', url:'https://puchi-pla.vercel.app' },
+            ].map(app => (
+              <a key={app.url} href={app.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-white rounded-xl border border-amber-100 shadow-sm no-underline text-gray-800">
+                <div className="flex-1">
+                  <div className="font-bold text-sm">{app.name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{app.desc}</div>
+                </div>
+                <span className="text-gray-300">→</span>
+              </a>
+            ))}
+          </div>
         </section>
 
         {/* フッター */}
